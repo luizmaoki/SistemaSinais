@@ -1,0 +1,91 @@
+x-local-logging: &local_logging
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "3"
+services:
+  postgres:
+    logging: *local_logging
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_USER: capital
+      POSTGRES_PASSWORD: capital_local
+      POSTGRES_DB: capital
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U capital -d capital"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+  redis:
+    logging: *local_logging
+    image: redis:7-alpine
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+  api:
+    logging: *local_logging
+    build:
+      context: .
+      dockerfile: infra/docker/api.Dockerfile
+    environment: &backend_env
+      APP_ENV: development
+      DEMO_MODE: "true"
+      DATABASE_URL: postgresql+psycopg://capital:capital_local@postgres:5432/capital
+      REDIS_URL: redis://redis:6379/0
+      SEC_USER_AGENT: ${SEC_USER_AGENT:-}
+      COINBASE_PERSONAL_USE_ACCEPTED: ${COINBASE_PERSONAL_USE_ACCEPTED:-false}
+    ports:
+      - "127.0.0.1:8000:8000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/api/v1/ready')"]
+      interval: 10s
+      timeout: 5s
+      retries: 20
+  worker:
+    logging: *local_logging
+    build:
+      context: .
+      dockerfile: infra/docker/api.Dockerfile
+    environment: *backend_env
+    command: ["celery", "-A", "app.tasks.celery_app", "worker", "--beat", "--loglevel=info", "--concurrency=1"]
+    depends_on:
+      api:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "celery", "-A", "app.tasks.celery_app", "inspect", "ping", "--timeout", "3"]
+      interval: 15s
+      timeout: 10s
+      retries: 10
+      start_period: 20s
+  web:
+    logging: *local_logging
+    build:
+      context: .
+      dockerfile: infra/docker/web.Dockerfile
+    environment:
+      API_URL: http://api:8000
+    ports:
+      - "127.0.0.1:3000:3000"
+    depends_on:
+      api:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3000/login',{signal:AbortSignal.timeout(5000)}).then(r=>process.exit(r.status===200?0:1)).catch(()=>process.exit(1))"]
+      interval: 10s
+      timeout: 8s
+      retries: 20
+      start_period: 20s
+volumes:
+  postgres_data:
+
+
+

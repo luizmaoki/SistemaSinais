@@ -1,0 +1,18 @@
+import Link from "next/link";
+import { AlertTriangle, ArrowUpRight, Database, RefreshCw, SearchX } from "lucide-react";
+import type { DataMode } from "@capital-intelligence/shared-types";
+import type { ApiError } from "@/lib/api";
+import { date, modeLabel, safeUrl } from "@/lib/format";
+export function ModeBadge({mode = "UNAVAILABLE"}: {mode?: DataMode}) { return <span className={"badge mode-" + mode.toLowerCase()}><span className="status-dot"/>{modeLabel[mode] ?? mode}</span>; }
+export function Panel({title,subtitle,actions,children,className = ""}: {title?: string;subtitle?: string;actions?: React.ReactNode;children: React.ReactNode;className?: string}) { return <section className={"panel " + className}>{(title || actions) && <div className="panel-heading"><div><h2>{title}</h2>{subtitle && <p>{subtitle}</p>}</div>{actions}</div>}{children}</section>; }
+export function PageHeading({eyebrow,title,description,actions}: {eyebrow?:string;title:string;description?:string;actions?:React.ReactNode}) { return <header className="page-heading"><div>{eyebrow && <p className="eyebrow">{eyebrow}</p>}<h1>{title}</h1>{description && <p className="muted">{description}</p>}</div>{actions && <div className="heading-actions">{actions}</div>}</header>; }
+export function SourceLine({source,at,mode,scope,dateOnly=false}: {dateOnly?:boolean;source?:string;at?:string|null;mode?:DataMode;scope?:string}) { return <div className="source-line"><Database size={12}/><span>{source ?? "Fonte indisponível"}</span><span className="dot-separator">·</span><time>{date(at,!dateOnly)}</time>{scope && <><span className="dot-separator">·</span><span>{scope}</span></>}<ModeBadge mode={mode}/></div>; }
+export function Loading({label = "Carregando dados"}: {label?:string}) { return <div className="loading-state" role="status" aria-live="polite"><div className="skeleton"/><div className="skeleton short"/><span>{label}…</span></div>; }
+export function ErrorState({error,retry}: {error:ApiError | Error;retry?:()=>void}) { return <div className="empty-state error-state" role="alert"><AlertTriangle size={24}/><h3>Dados indisponíveis</h3><p>{error.message}</p>{"code" in error && <code>{String(error.code)}</code>}{retry && <button className="button small" onClick={retry}><RefreshCw size={14}/>Tentar novamente</button>}</div>; }
+export function EmptyState({title = "Nenhum registro encontrado",description,action}: {title?:string;description?:string;action?:React.ReactNode}) { return <div className="empty-state"><SearchX size={25}/><h3>{title}</h3>{description && <p>{description}</p>}{action}</div>; }
+export function ExternalLink({href,children,className = ""}: {href?:string|null;children:React.ReactNode;className?:string}) { const url = safeUrl(href); return url ? <a className={"external-link " + className} href={url} target="_blank" rel="noopener noreferrer">{children}<ArrowUpRight size={13}/><span className="sr-only"> (abre em nova aba)</span></a> : <span className="muted">{children} · link indisponível</span>; }
+export function Notice({children,kind = "info"}: {children:React.ReactNode;kind?:"info"|"warning"}) { return <div className={"notice notice-" + kind}><AlertTriangle size={15}/><div>{children}</div></div>; }
+export function AssetMark({symbol}: {symbol:string}) { return <span className={"asset-mark asset-" + symbol.split("-")[0].toLowerCase()} aria-hidden="true">{symbol.startsWith("BTC") ? "₿" : symbol.startsWith("ETH") ? "Ξ" : symbol.slice(0,2)}</span>; }
+export function MoreLink({href,children = "Ver todos"}: {href:string;children?:React.ReactNode}) { return <Link className="text-link" href={href}>{children}<ArrowUpRight size={14}/></Link>; }
+
+

@@ -1,0 +1,1 @@
+{"fixture_id":"demo_daily_bars_v1","data_mode":"DEMO","evidence_kind":"SIMULATED","source_id":"demo","generation":"services/api/app/seed.py","dates":"2026-01-01 through 2026-10-07","note":"Entirely synthetic. Never fill a real provider gap with this dataset."}

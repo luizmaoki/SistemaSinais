@@ -1,0 +1,53 @@
+name: ci
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  checks:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+          cache-dependency-path: apps/web/package-lock.json
+      - run: python -m pip install -r services/api/requirements.txt
+      - run: python -m ruff check services/api services/worker && python -m ruff check --select E4,E7,E9,F scripts infra/migrations
+      - run: python -m unittest discover -s scripts/tests -v
+      - run: npm ci
+        working-directory: apps/web
+      - run: npm run lint && npm run typecheck && npm run build
+        working-directory: apps/web
+      - name: Clean installation migrations backup restore and persistence
+        run: python scripts/foundation_check.py
+      - run: docker compose up --build -d --wait --wait-timeout 240
+      - run: python scripts/smoke.py
+      - run: npx playwright install --with-deps chromium
+        working-directory: apps/web
+      - run: npm run test:e2e
+        working-directory: apps/web
+        env:
+          PLAYWRIGHT_HTML_OPEN: never
+      - name: Preserve validation reports without database archives
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: foundation-report
+          path: artifacts/foundation/**/report.json
+          if-no-files-found: ignore
+          retention-days: 7
+      - if: failure()
+        run: docker compose logs --tail=100
+      - if: always()
+        run: docker compose down

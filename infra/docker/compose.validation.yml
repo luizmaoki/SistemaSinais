@@ -1,0 +1,13 @@
+# Requires Docker Compose 2.24.4+ for !override. Only used by foundation_check.py.
+services:
+  api:
+    ports: !override ["127.0.0.1::8000"]
+    environment:
+      SEC_USER_AGENT: ""
+      COINBASE_PERSONAL_USE_ACCEPTED: "false"
+  web:
+    ports: !override ["127.0.0.1::3000"]
+  worker:
+    environment:
+      SEC_USER_AGENT: ""
+      COINBASE_PERSONAL_USE_ACCEPTED: "false"
