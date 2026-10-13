@@ -54,3 +54,5 @@ O status de cada recurso precisa ser conferido em docs/progress.md; uma rota exi
 ## Passo 1 da evolução
 
 Procedimento e evidências em docs/foundation-step-1.md. Validação isolada: python scripts/foundation_check.py. Backup com conferência de restauração: scripts/db_backup.py. O workflow de CI inclui essas verificações; execução remota depende do repositório de destino.
+
+CI remota da fundação aprovada em 13/10/2026: https://github.com/luizmaoki/SistemaSinais/actions/runs/38444822636. Evidências e escopo em docs/ci-validation.md. O passo 1 está concluído.

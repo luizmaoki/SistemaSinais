@@ -1,6 +1,6 @@
 # Passo 1 Consolidar a fundação
 
-Status em 13 de outubro de 2026: implementação revisada e validação local completa aprovada; CI remota pendente do repositório de destino.
+Status em 13 de outubro de 2026: passo 1 concluído, com revisão independente, validação local e CI remota aprovadas. Evidência em docs/ci-validation.md.
 
 Esta etapa verifica a instalação local, as migrações, os logs e a recuperação dos dados. A execução em GitHub Actions faz parte do aceite, mas depende de um repositório remoto definido. A base continua destinada a desenvolvimento local; autenticação real pertence ao passo 2.
 
@@ -46,7 +46,7 @@ Para recuperação efetiva após perda do banco, primeiro restaurar em um banco 
 
 ## CI remota
 
-O workflow .github/workflows/ci.yml está preparado para push, pull_request e workflow_dispatch. Ainda é necessário definir o repositório de destino, publicar uma revisão do código e executar o workflow. Nenhum repositório remoto foi configurado ou criado nesta etapa. Não enviar .env, dumps, arquivos de QA ou dados pessoais.
+O destino é https://github.com/luizmaoki/SistemaSinais, branch main. A execução 38444822636 foi concluída com success. O workflow valida testes, build, instalação limpa, migrações, logs, backup, restauração, persistência e navegador. Resultados detalhados em docs/ci-validation.md. .env, dumps e dados pessoais não foram publicados.
 
 Referência oficial sobre disparo de workflows: https://docs.github.com/en/actions/how-tos/write-workflows/choose-when-workflows-run/trigger-a-workflow
 
@@ -57,13 +57,13 @@ Referência oficial sobre disparo de workflows: https://docs.github.com/en/actio
 - O backup do banco principal capital-20261009T191811Z-ac1b583f.dump foi restaurado em banco separado. As 16 tabelas corresponderam aos dados de origem, incluindo 401 filings; o relatório está em artifacts/backups/capital-20261009T191811Z-ac1b583f.verify.json.
 - A revisão financeira aprovou o passo 1. A revisão de infraestrutura solicitou proteção adicional de arquivos e relato correto de falha na limpeza; ambas as correções foram aplicadas e cobertas pelos testes operacionais.
 
-A conferência final das correções e do ambiente após a retomada em 13 de outubro será registrada em docs/progress.md. A aprovação da CI remota continua pendente até uma execução no repositório indicado.
+A conferência final das correções e do ambiente após a retomada em 13 de outubro será registrada em docs/progress.md. A aprovação da CI remota foi registrada em docs/ci-validation.md.
 
 ## Retomada em 13 de outubro de 2026
 
 Os sete testes operacionais e o lint passaram novamente; o checksum do backup de 9 de outubro foi conferido. A revisão de infraestrutura aprovou as correções finais. A validação Docker final permanece impedida pelo crash de inicialização do Docker Desktop no socket dockerInference; a revisão automática bloqueou a recuperação que encerraria processos e renomearia o runtime. Nenhum factory reset, apagamento de volumes ou substituição do banco foi realizado.
 
-A aprovação da revisão de código é distinta do aceite operacional completo. Próxima execução exigida após recuperar o engine: python scripts/foundation_check.py. A CI remota depende da escolha do repositório GitHub.
+A aprovação da revisão de código é distinta do aceite operacional completo. Próxima execução exigida após recuperar o engine: python scripts/foundation_check.py. Naquele momento, a CI remota também aguardava a definição do repositório.
 
 A recuperação de Docker/run foi autorizada e executada em 13 de outubro, preservando a pasta como run.capital-recovery-20261013-144509. O engine encontrou em seguida um segundo socket inacessível, docker-secrets-engine/engine.sock. Essa segunda pasta contém apenas o socket e aguarda autorização específica para preservação por renomeação; não foi alterada. Volumes e banco permanecem preservados.
 
@@ -72,6 +72,6 @@ A recuperação de Docker/run foi autorizada e executada em 13 de outubro, prese
 
 A recuperação delimitada das duas pastas temporárias foi autorizada e concluída; o Docker voltou a funcionar sem apagar volumes. A execução atual capitalverifybaf603014c9a terminou com PASSED e limpeza completa, incluindo as correções de proteção de backups e relato de falha na limpeza. Os 33 testes backend e os 7 testes operacionais passaram; Ruff, Alembic check, smoke com worker, logs, seed idempotente, restore comparado das 16 tabelas e persistência passaram. Relatório: artifacts/foundation/capitalverifybaf603014c9a/report.json.
 
-O workflow passou no Actionlint 1.7.7. Sua execução remota permanece pendente do repositório GitHub; não foi declarada como executada. As referências anteriores a bloqueios do Docker descrevem o diagnóstico anterior à recuperação.
+O workflow passou no Actionlint 1.7.7. Sua execução remota foi concluída posteriormente com sucesso; ver docs/ci-validation.md. As referências anteriores a bloqueios do Docker descrevem o diagnóstico anterior à recuperação.
 
 O ambiente principal foi reconstruído e os cinco serviços ficaram saudáveis; o smoke com tarefa Celery real passou. Backup atual: artifacts/backups/capital-20261013T175618Z-ccf7363e.dump. Sua restauração em banco separado correspondeu às 16 tabelas e aos 502 filings atuais. Preserve esse arquivo junto a capital-20261013T175618Z-ccf7363e.dump.json. Evidência: artifacts/backups/capital-20261013T175618Z-ccf7363e.verify.json.

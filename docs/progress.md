@@ -44,7 +44,7 @@ A inspeção visual encontrou expansão indevida da página por rótulos acessí
 
 ## Passo 1 Consolidar a fundação
 
-Atualização em 13 de outubro de 2026. Código implementado e revisado; a validação operacional local com as correções finais passou. O aceite completo depende apenas da execução da CI remota no repositório de destino.
+Atualização em 13 de outubro de 2026. Código implementado e revisado; a validação operacional local com as correções finais passou. O passo 1 está concluído, incluindo a execução da CI remota; evidência em docs/ci-validation.md.
 
 Entregas: scripts de instalação isolada, backup PostgreSQL binário com checksum e restauração em banco novo, comparação de tabelas, persistência após recriar containers, logs JSON com campos permitidos, rotação Docker, healthcheck web, teste ampliado de migração e seed, e CI com execução manual e relatórios sem dumps. Procedimento em docs/foundation-step-1.md.
 
@@ -80,3 +80,12 @@ Foi criado um backup novo em 13 de outubro: artifacts/backups/capital-20261013T1
 ### Publicação da fundação e CI remota
 
 O operador indicou https://github.com/luizmaoki/SistemaSinais.git como destino. O repositório foi conferido vazio, com branch padrão main. O remote origin foi configurado; a publicação inicial usa a revisão local aprovada. .env, dumps, relatórios locais e o arquivo pessoal da skill permanecem fora do Git. A identidade de commit usa o endereço noreply do GitHub. A execução remota da CI será registrada após sua conclusão, sem confundir o resultado com a validação local.
+
+
+### Passo 1 concluído com CI remota
+
+Em 13 de outubro de 2026, o código foi publicado na main de https://github.com/luizmaoki/SistemaSinais. A execução https://github.com/luizmaoki/SistemaSinais/actions/runs/38444822636 terminou com completed/success para o commit ca456adc94d48bb3b1c3eeab9508d0280dd44316.
+
+Evidência remota: 33 testes backend, 7 operacionais e 6 Playwright passaram; lint/typecheck/build, instalação limpa, migrações, logs, backup/restauração, persistência, worker real e limpeza passaram. O artefato foundation-report foi publicado sem dumps. Relatório completo em docs/ci-validation.md.
+
+O passo 1 está concluído. O passo 2 ainda não foi iniciado. A atualização de documentação que registra a CI não altera o código testado.
