@@ -1,6 +1,6 @@
 # Passo 2 — autenticação OIDC e isolamento
 
-Implementação local concluída e validada em 17 de outubro de 2026. Publicação e execução da nova CI registradas separadamente, conforme disponibilidade do repositório remoto.
+Implementação local concluída e validada em 17 de outubro de 2026. Publicação no PR 1 e nova CI remota aprovadas; evidências em docs/auth-ci-validation.md.
 
 O provedor escolhido é Keycloak local. O login identifica o usuário; a classificação DEMO dos dados financeiros continua indicando a origem simulada das séries.
 
@@ -65,4 +65,3 @@ A autenticação local não depende de API externa contratada. Produção requer
 
 As versões estão fixadas. A suíte registra depreciações de Authlib jose e do transporte TestClient; uma atualização futura deve migrar essas interfaces mantendo os mesmos testes de rejeição e isolamento.
 A regressão no modo demo também passou em 17/10: 16 cenários e dois testes exclusivos OIDC ignorados. Os 18 cenários distintos da suíte foram cobertos entre os dois modos. O projeto descartável capitaldemoe2e20261017 foi removido após salvar os resultados; o ambiente capitaloidc permanece disponível.
-

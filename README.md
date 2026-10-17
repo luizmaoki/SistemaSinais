@@ -60,3 +60,5 @@ CI remota da fundação aprovada em 13/10/2026: https://github.com/luizmaoki/Sis
 ## Passo 2 — Keycloak local
 
 Ambiente separado: python scripts/oidc_local.py up. Acesse http://localhost:13000/login. Contas de teste, comandos e limites em [docs/auth-step-2.md](docs/auth-step-2.md). O login não altera a classificação DEMO das séries financeiras.
+
+CI remota do passo 2 aprovada em 17/10/2026: [evidências](docs/auth-ci-validation.md). Login OIDC, isolamento, migração e regressão demo validados; [PR 1](https://github.com/luizmaoki/SistemaSinais/pull/1).
