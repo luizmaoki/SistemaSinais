@@ -89,3 +89,15 @@ Em 13 de outubro de 2026, o código foi publicado na main de https://github.com/
 Evidência remota: 33 testes backend, 7 operacionais e 6 Playwright passaram; lint/typecheck/build, instalação limpa, migrações, logs, backup/restauração, persistência, worker real e limpeza passaram. O artefato foundation-report foi publicado sem dumps. Relatório completo em docs/ci-validation.md.
 
 O passo 1 está concluído. O passo 2 ainda não foi iniciado. A atualização de documentação que registra a CI não altera o código testado.
+
+## Passo 2 iniciado — 14 de outubro de 2026
+
+Provedor escolhido pelo usuário: Keycloak local. Ambiente OIDC separado em implementação, com projeto Compose capitaloidc, portas 13000/18000/18080 e contas sintéticas de duas identidades. O Keycloak 26.8.1 iniciou, importou o realm e publicou discovery com issuer exato e suporte a S256. Nove testes operacionais e Ruff dos scripts passaram. A implementação de login, sessão e interface e suas revisões estão em andamento; ainda não se declara o passo 2 concluído. Procedimento em docs/auth-step-2.md.
+
+## Passo 2 — validação local concluída em 17 de outubro de 2026
+
+OIDC com Keycloak local, sessão opaca revogável, CSRF, papéis owner/viewer e isolamento de usuários/organizações implementados. Duas revisões independentes aprovaram o código e os ajustes finais. A aplicação OIDC executa no projeto separado capitaloidc em localhost:13000; o banco demo principal foi preservado.
+
+Passaram 116 testes backend, nove operacionais, Ruff, lint, TypeScript e build. O fluxo real de Keycloak passou com Alice/Bob: dados persistem após reload, Bob não acessa recursos de Alice, logout invalida a sessão, origem externa/CSRF incorreto são rejeitados e a classificação financeira DEMO permanece explícita. Execução OIDC: 12 cenários passaram e seis específicos demo foram ignorados.
+
+A validação PostgreSQL capitalverifyabf0b3b1d865 terminou PASSED com migração 0002, restauração verificada de 18 tabelas, seed idempotente, logs sem sentinela sensível, persistência entre recriações e limpeza dos recursos isolados. Relatório preservado em artifacts/foundation/capitalverifyabf0b3b1d865/report.json. Detalhes, comandos e limites em docs/auth-step-2.md e docs/decisions/004-oidc-session.md. A execução remota da nova CI ainda deve ser confirmada e não é inferida dos testes locais.

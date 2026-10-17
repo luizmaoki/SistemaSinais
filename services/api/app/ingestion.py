@@ -8,7 +8,7 @@ from app.adapters.sec import SECAdapter
 from app.config import get_settings
 from app.database import SessionLocal, utcnow
 from app.errors import ProviderError
-from app.models import Alert, AlertRule, Asset, Filing, IngestionRun, MarketBar, ProviderState
+from app.models import Alert, AlertRule, Asset, Filing, IngestionRun, MarketBar, ProviderState, User
 
 
 def evaluate_alerts(session):
@@ -17,7 +17,11 @@ def evaluate_alerts(session):
 
     insert = pg_insert if session.get_bind().dialect.name == "postgresql" else sqlite_insert
     created = 0
-    for rule in session.scalars(select(AlertRule).where(AlertRule.enabled.is_(True))):
+    for rule in session.scalars(
+        select(AlertRule).join(User, User.id == AlertRule.user_id).where(
+            AlertRule.enabled.is_(True), User.active.is_(True), User.tenant_id == AlertRule.tenant_id,
+        )
+    ):
         if rule.source_id == "coinbase" and not get_settings().coinbase_personal_use_accepted:
             continue
         bar = session.scalar(

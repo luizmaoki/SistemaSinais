@@ -32,8 +32,19 @@ services:
       context: .
       dockerfile: infra/docker/api.Dockerfile
     environment: &backend_env
-      APP_ENV: development
-      DEMO_MODE: "true"
+      APP_ENV: ${APP_ENV:-development}
+      DEMO_MODE: ${DEMO_MODE:-true}
+      AUTH_MODE: ${AUTH_MODE:-demo}
+      OIDC_ISSUER: ${OIDC_ISSUER:-}
+      OIDC_INTERNAL_BASE_URL: ${OIDC_INTERNAL_BASE_URL:-}
+      OIDC_CLIENT_ID: ${OIDC_CLIENT_ID:-}
+      OIDC_CLIENT_SECRET: ${OIDC_CLIENT_SECRET:-}
+      AUTH_PUBLIC_BASE_URL: ${AUTH_PUBLIC_BASE_URL:-http://localhost:3000}
+      SESSION_COOKIE_SECURE: ${SESSION_COOKIE_SECURE:-false}
+      SESSION_TTL_SECONDS: ${SESSION_TTL_SECONDS:-3600}
+      OIDC_FLOW_TTL_SECONDS: ${OIDC_FLOW_TTL_SECONDS:-600}
+      CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:3000,http://127.0.0.1:3000}
+      ALLOWED_HOSTS: ${ALLOWED_HOSTS:-localhost,127.0.0.1,api,testserver}
       DATABASE_URL: postgresql+psycopg://capital:capital_local@postgres:5432/capital
       REDIS_URL: redis://redis:6379/0
       SEC_USER_AGENT: ${SEC_USER_AGENT:-}
@@ -73,6 +84,7 @@ services:
       dockerfile: infra/docker/web.Dockerfile
     environment:
       API_URL: http://api:8000
+      PUBLIC_APP_ORIGINS: ${PUBLIC_APP_ORIGINS:-http://localhost:3000,http://127.0.0.1:3000}
     ports:
       - "127.0.0.1:3000:3000"
     depends_on:

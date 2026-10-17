@@ -44,3 +44,69 @@ def test_initial_migration_upgrade_downgrade_upgrade(tmp_path, monkeypatch):
                 engine.dispose()
     finally:
         get_settings.cache_clear()
+
+
+def test_oidc_migration_preserves_populated_legacy_data(tmp_path, monkeypatch):
+    from datetime import timedelta
+    from app.auth import DEMO_USER_ID
+    from app.database import utcnow
+    from app.models import AuthFlow, AuthSession, User
+
+    database_url = "sqlite:///" + str(tmp_path / "populated-oidc-migration.db")
+    config = Config(str(Path(__file__).resolve().parents[1] / "alembic.ini"))
+
+    def legacy_snapshot(connection):
+        return {
+            table.name: connection.execute(select(*[
+                column for column in table.columns
+                if not (table.name == "users" and column.name in {"active", "oidc_issuer", "oidc_subject"})
+            ]).order_by(*table.primary_key.columns)).all()
+            for table in Base.metadata.sorted_tables
+            if table.name not in {"auth_flows", "auth_sessions"}
+        }
+
+    try:
+        with monkeypatch.context() as context:
+            context.setenv("DATABASE_URL", database_url)
+            get_settings.cache_clear()
+            command.upgrade(config, "head")
+            engine = build_engine(database_url)
+            try:
+                with Session(engine) as session:
+                    seed(session)
+                    session.add(AuthFlow(
+                        state_hash="a" * 64, binding_hash="b" * 64,
+                        nonce="n" * 43, code_verifier="v" * 86,
+                        expires_at=utcnow() + timedelta(minutes=5),
+                    ))
+                    session.add(AuthSession(
+                        id_hash="c" * 64, user_id=DEMO_USER_ID, csrf_token="s" * 43,
+                        expires_at=utcnow() + timedelta(minutes=5),
+                    ))
+                    session.commit()
+                    expected = legacy_snapshot(session)
+                command.downgrade(config, "0001")
+                with engine.connect() as connection:
+                    assert legacy_snapshot(connection) == expected
+                assert "auth_sessions" not in inspect(engine).get_table_names()
+                assert {"active", "oidc_subject", "oidc_issuer"}.isdisjoint(
+                    column["name"] for column in inspect(engine).get_columns("users")
+                )
+                command.upgrade(config, "head")
+                command.check(config)
+                with Session(engine) as session:
+                    assert legacy_snapshot(session) == expected
+                    user = session.get(User, DEMO_USER_ID)
+                    assert user.active is True and user.oidc_issuer is None and user.oidc_subject is None
+                    assert session.scalars(select(AuthFlow)).all() == []
+                    assert session.scalars(select(AuthSession)).all() == []
+                indexes = inspect(engine).get_indexes("users")
+                assert any(
+                    index["name"] == "ix_users_oidc_identity" and index["unique"]
+                    and index["column_names"] == ["oidc_issuer", "oidc_subject"]
+                    for index in indexes
+                )
+            finally:
+                engine.dispose()
+    finally:
+        get_settings.cache_clear()

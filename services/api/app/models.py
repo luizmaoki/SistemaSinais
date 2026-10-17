@@ -2,7 +2,7 @@ from datetime import date, datetime
 from decimal import Decimal
 from uuid import uuid4
 
-from sqlalchemy import JSON, Boolean, Date, ForeignKey, Index, Integer, Numeric, String, Text, UniqueConstraint
+from sqlalchemy import JSON, Boolean, Date, ForeignKey, Index, Integer, Numeric, String, Text, UniqueConstraint, true
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.database import Base, UTCDateTime, utcnow
@@ -20,10 +20,31 @@ class Tenant(Base):
 
 class User(Base):
     __tablename__ = "users"
+    __table_args__ = (Index("ix_users_oidc_identity", "oidc_issuer", "oidc_subject", unique=True),)
     id: Mapped[str] = mapped_column(String(36), primary_key=True)
     tenant_id: Mapped[str] = mapped_column(ForeignKey("tenants.id"), index=True)
     name: Mapped[str] = mapped_column(String(100))
     role: Mapped[str] = mapped_column(String(30), default="owner")
+    oidc_issuer: Mapped[str | None] = mapped_column(String(500))
+    oidc_subject: Mapped[str | None] = mapped_column(String(255))
+    active: Mapped[bool] = mapped_column(Boolean, default=True, server_default=true())
+
+
+class AuthSession(Base):
+    __tablename__ = "auth_sessions"
+    id_hash: Mapped[str] = mapped_column(String(64), primary_key=True)
+    user_id: Mapped[str] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True)
+    csrf_token: Mapped[str] = mapped_column(String(43))
+    expires_at: Mapped[datetime] = mapped_column(UTCDateTime, index=True)
+
+
+class AuthFlow(Base):
+    __tablename__ = "auth_flows"
+    state_hash: Mapped[str] = mapped_column(String(64), primary_key=True)
+    binding_hash: Mapped[str] = mapped_column(String(64))
+    nonce: Mapped[str] = mapped_column(String(43))
+    code_verifier: Mapped[str] = mapped_column(String(86))
+    expires_at: Mapped[datetime] = mapped_column(UTCDateTime, index=True)
 
 
 class Asset(Base):
