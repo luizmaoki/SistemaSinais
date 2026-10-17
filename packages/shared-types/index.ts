@@ -37,7 +37,18 @@ export interface MacroEvent {
   actual?: number | null; consensus?: number | null; previous?: number | null; revised_previous?: number | null;
   unit?: string; importance?: string | number; source_id: string; source_uri?: string; data_mode: DataMode;
 }
-export interface Session { mode: DataMode; user: { id: string; name: string }; tenant_id: string; role: string; }
+/** Authentication describes identity only; financial data keeps its own DataMode. */
+export type AuthMode = "demo" | "oidc";
+export interface AuthConfig { auth_mode: AuthMode; configured: boolean; demo_available: boolean; login_path: "/api/v1/auth/login"; }
+export interface Session {
+  mode: "DEMO" | "AUTHENTICATED";
+  auth_mode: AuthMode;
+  user: { id: string; name: string };
+  tenant_id: string;
+  role: "owner" | "viewer";
+  csrf_token: string | null;
+  expires_at?: string;
+}
 
 
 

@@ -12,7 +12,8 @@ from pydantic import BaseModel, ConfigDict, Field
 from redis import Redis
 from sqlalchemy import func, select, text
 from sqlalchemy.orm import Session
-from app.auth import Principal, get_principal
+from app.auth import Principal, get_principal, require_writer
+from app.auth_routes import router as auth_router
 from app.calculations import monthly_returns, technical_metrics
 from app.config import get_settings
 from app.database import get_db, utcnow
@@ -33,12 +34,14 @@ async def lifespan(app):
 
 
 app = FastAPI(title="Capital Intelligence", version="0.1.0", lifespan=lifespan)
-app.add_middleware(TrustedHostMiddleware, allowed_hosts=settings.allowed_hosts.split(","))
+app.include_router(auth_router)
+app.add_middleware(TrustedHostMiddleware, allowed_hosts=settings.host_allowlist)
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=settings.cors_origins.split(","),
+    allow_origins=settings.allowed_origins,
+    allow_credentials=True,
     allow_methods=["GET", "POST", "PATCH", "DELETE"],
-    allow_headers=["Content-Type"],
+    allow_headers=["Content-Type", "X-CSRF-Token"],
 )
 _request_counts = {}
 
@@ -62,7 +65,7 @@ async def guards(request: Request, call_next):
         )
     if request.method in {"POST", "PATCH", "DELETE"}:
         origin = request.headers.get("origin")
-        if origin and origin not in settings.cors_origins.split(","):
+        if origin is not None and origin not in settings.allowed_origins:
             return JSONResponse(
                 {"detail": {"code": "INVALID_ORIGIN", "message": "Origem não autorizada."}}, status_code=403
             )
@@ -86,6 +89,7 @@ async def guards(request: Request, call_next):
             "X-Content-Type-Options": "nosniff",
             "X-Frame-Options": "DENY",
             "Cache-Control": "no-store",
+            "Referrer-Policy": "no-referrer",
         }
     )
     logger.info({
@@ -154,7 +158,10 @@ def asset_row(asset, session):
 
 @app.get(PREFIX + "/health")
 def health():
-    return {"status": "ok", "service": "capital_intelligence", "mode": "DEMO"}
+    return {
+        "status": "ok", "service": "capital_intelligence",
+        "mode": "DEMO" if settings.demo_available else "OIDC",
+    }
 
 
 @app.get(PREFIX + "/ready")
@@ -165,16 +172,6 @@ def ready(db: Session = Depends(get_db)):
     except Exception:
         raise api_error(503, "DEPENDENCY_UNAVAILABLE", "Banco ou fila indisponível.") from None
     return {"status": "ready", "database": "ok", "redis": "ok"}
-
-
-@app.get(PREFIX + "/auth/session", dependencies=authenticated)
-def auth_session(principal: Principal = Depends(get_principal)):
-    return {
-        "mode": "DEMO",
-        "user": {"id": principal.user_id, "name": "Usuário demo"},
-        "tenant_id": principal.tenant_id,
-        "role": principal.role,
-    }
 
 
 @app.get(PREFIX + "/assets", dependencies=authenticated)
@@ -417,7 +414,7 @@ def watchlists(db: Session = Depends(get_db), principal: Principal = Depends(get
 
 @app.post(PREFIX + "/watchlists", status_code=201)
 def create_watchlist(
-    body: WatchlistInput, db: Session = Depends(get_db), principal: Principal = Depends(get_principal)
+    body: WatchlistInput, db: Session = Depends(get_db), principal: Principal = Depends(require_writer)
 ):
     row = Watchlist(tenant_id=principal.tenant_id, user_id=principal.user_id, name=body.name.strip())
     db.add(row)
@@ -429,7 +426,7 @@ def create_watchlist(
 
 @app.post(PREFIX + "/watchlists/{watchlist_id}/assets")
 def add_asset(
-    watchlist_id: UUID, body: AddAsset, db: Session = Depends(get_db), principal: Principal = Depends(get_principal)
+    watchlist_id: UUID, body: AddAsset, db: Session = Depends(get_db), principal: Principal = Depends(require_writer)
 ):
     owned_watchlist(db, watchlist_id, principal)
     get_asset(db, body.asset_id)
@@ -443,7 +440,7 @@ def add_asset(
 
 @app.delete(PREFIX + "/watchlists/{watchlist_id}/assets/{asset_id}")
 def remove_asset(
-    watchlist_id: UUID, asset_id: UUID, db: Session = Depends(get_db), principal: Principal = Depends(get_principal)
+    watchlist_id: UUID, asset_id: UUID, db: Session = Depends(get_db), principal: Principal = Depends(require_writer)
 ):
     owned_watchlist(db, watchlist_id, principal)
     row = db.get(WatchlistAsset, {"watchlist_id": str(watchlist_id), "asset_id": str(asset_id)})
@@ -469,7 +466,7 @@ def rules(db: Session = Depends(get_db), principal: Principal = Depends(get_prin
 
 
 @app.post(PREFIX + "/alert-rules", status_code=201)
-def create_rule(body: RuleInput, db: Session = Depends(get_db), principal: Principal = Depends(get_principal)):
+def create_rule(body: RuleInput, db: Session = Depends(get_db), principal: Principal = Depends(require_writer)):
     asset, bars = series(db, body.asset_id, body.source_id)
     if not bars:
         raise api_error(503, "DATASET_UNAVAILABLE", "Série indisponível para esta regra.")
@@ -491,7 +488,7 @@ def create_rule(body: RuleInput, db: Session = Depends(get_db), principal: Princ
 
 @app.patch(PREFIX + "/alert-rules/{rule_id}")
 def patch_rule(
-    rule_id: UUID, body: RulePatch, db: Session = Depends(get_db), principal: Principal = Depends(get_principal)
+    rule_id: UUID, body: RulePatch, db: Session = Depends(get_db), principal: Principal = Depends(require_writer)
 ):
     row = db.scalar(
         select(AlertRule).where(

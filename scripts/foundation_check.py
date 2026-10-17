@@ -16,7 +16,7 @@ from docker_utils import ROOT, run_compose
 STABLE_TABLES = {
     "alembic_version", "assets", "asset_identifiers", "asset_corporate_actions",
     "users", "tenants", "market_bars", "filings", "macro_events", "watchlists",
-    "watchlist_assets", "alert_rules", "alerts", "audit_logs",
+    "watchlist_assets", "alert_rules", "alerts", "audit_logs", "auth_sessions", "auth_flows",
 }
 
 
@@ -123,5 +123,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-
-

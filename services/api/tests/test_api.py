@@ -76,7 +76,7 @@ def test_alert_evidence_and_deduplication(client, db):
 
 
 def test_production_startup_fails_closed():
-    with pytest.raises(RuntimeError, match="Production is disabled"):
+    with pytest.raises(RuntimeError, match="production requires AUTH_MODE=oidc"):
         Settings(APP_ENV="production").assert_auth_ready()
     with pytest.raises(RuntimeError, match="DEMO_MODE"):
         Settings(APP_ENV="development", demo_mode=False).assert_auth_ready()

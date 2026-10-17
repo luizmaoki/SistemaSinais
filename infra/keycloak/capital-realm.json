@@ -1,0 +1,27 @@
+{
+  "realm": "capital",
+  "enabled": true,
+  "displayName": "Capital Intelligence — desenvolvimento local",
+  "sslRequired": "none",
+  "registrationAllowed": false,
+  "resetPasswordAllowed": false,
+  "loginWithEmailAllowed": false,
+  "accessTokenLifespan": 3600,
+  "clients": [{
+    "clientId": "capital-web",
+    "enabled": true,
+    "protocol": "openid-connect",
+    "publicClient": true,
+    "standardFlowEnabled": true,
+    "implicitFlowEnabled": false,
+    "directAccessGrantsEnabled": false,
+    "serviceAccountsEnabled": false,
+    "redirectUris": ["http://localhost:13000/api/v1/auth/callback"],
+    "webOrigins": ["http://localhost:13000"],
+    "attributes": {"pkce.code.challenge.method": "S256"}
+  }],
+  "users": [
+    {"username": "alice", "email": "alice@example.invalid", "emailVerified": true, "enabled": true, "firstName": "Alice", "lastName": "Local", "credentials": [{"type": "password", "value": "Alice-local-only-2026!", "temporary": false}]},
+    {"username": "bob", "email": "bob@example.invalid", "emailVerified": true, "enabled": true, "firstName": "Bob", "lastName": "Local", "credentials": [{"type": "password", "value": "Bob-local-only-2026!", "temporary": false}]}
+  ]
+}

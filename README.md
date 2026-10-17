@@ -29,7 +29,7 @@ Encerrar preservando dados:
 
 Catálogo de ativos, pesquisa, séries históricas demo identificadas, retornos mensais, watchlists e regras de alerta locais, calendário demonstrativo, fontes e metadados de filings SEC. Dados reais nunca são substituídos silenciosamente por fixtures. Dados Coinbase exigem aceite de uso pessoal e ficam desativados por padrão; sem acesso por agentes de IA ou processamento LLM.
 
-Demo é restrita a desenvolvimento pessoal. Produção/SaaS exige implementação de OIDC e autorização real, revisão de licenças/entitlements e infraestrutura adequada. Não há execução de ordens.
+Demo é restrita a desenvolvimento pessoal. OIDC com Keycloak local está implementado e validado no passo 2; veja docs/auth-step-2.md. Produção/SaaS exige configuração segura do provedor, revisão de licenças/entitlements e infraestrutura adequada. Não há execução de ordens.
 
 ## Documentação
 
@@ -56,3 +56,9 @@ O status de cada recurso precisa ser conferido em docs/progress.md; uma rota exi
 Procedimento e evidências em docs/foundation-step-1.md. Validação isolada: python scripts/foundation_check.py. Backup com conferência de restauração: scripts/db_backup.py. O workflow de CI inclui essas verificações; execução remota depende do repositório de destino.
 
 CI remota da fundação aprovada em 13/10/2026: https://github.com/luizmaoki/SistemaSinais/actions/runs/38444822636. Evidências e escopo em docs/ci-validation.md. O passo 1 está concluído.
+
+## Passo 2 — Keycloak local
+
+Ambiente separado: python scripts/oidc_local.py up. Acesse http://localhost:13000/login. Contas de teste, comandos e limites em [docs/auth-step-2.md](docs/auth-step-2.md). O login não altera a classificação DEMO das séries financeiras.
+
+CI remota do passo 2 aprovada em 17/10/2026: [evidências](docs/auth-ci-validation.md). Login OIDC, isolamento, migração e regressão demo validados; [PR 1](https://github.com/luizmaoki/SistemaSinais/pull/1).

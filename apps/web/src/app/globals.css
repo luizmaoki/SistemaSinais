@@ -5,3 +5,5 @@
 /* Keep related disclosures readable without stretching the dashboard. */
 .two-columns .event-list { position: relative; max-height: 540px; overflow-y: auto; scrollbar-gutter: stable; }
 
+
+.identity-authenticated{color:var(--teal);background:#163333;border-color:#2a5350}.session-user{max-width:145px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:11px}.session-user small{font-size:9px}.topbar-actions{flex-shrink:0}.global-search{min-width:0}.readonly-note{margin-bottom:16px}input:disabled,select:disabled{opacity:.55;cursor:default}@media(max-width:1250px){.topbar{gap:12px}.topbar-actions{gap:8px}.session-user{max-width:95px}}@media(max-width:560px){.session-user{display:none}.topbar-actions>.identity-badge{display:inline-flex;font-size:7px}.topbar-actions{gap:4px}.global-search{gap:5px;padding:0 7px}}

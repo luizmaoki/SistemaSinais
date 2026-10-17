@@ -1,6 +1,7 @@
 import os
 
 os.environ["APP_ENV"] = "test"
+os.environ["AUTH_MODE"] = "demo"
 os.environ["DEMO_MODE"] = "true"
 os.environ["DATABASE_URL"] = "sqlite:///:memory:"
 os.environ["SEC_USER_AGENT"] = ""

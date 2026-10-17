@@ -1,5 +1,7 @@
 import { test, expect } from "@playwright/test";
 
+test.skip(process.env.E2E_AUTH_MODE === "oidc", "Fluxos demonstrativos usam a configuração de autenticação demo.");
+
 test("demo, busca repetida, gráfico e retornos", async ({page})=>{
   await page.goto("/login");
   await page.getByRole("button",{name:"Entrar no ambiente demo"}).click();
@@ -91,4 +93,3 @@ test("proxy rejeita origem externa", async ({request}) => {
   expect(response.status()).toBe(403);
   expect((await response.json()).detail.code).toBe("INVALID_ORIGIN");
 });
-
