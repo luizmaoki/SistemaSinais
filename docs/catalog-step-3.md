@@ -1,6 +1,6 @@
 # Passo 3 — catálogo e integridade dos dados
 
-Iniciado em 17 de outubro de 2026. Código e validação local aprovados em 23 de outubro de 2026; publicação e CI remota em andamento.
+Iniciado em 17 de outubro de 2026. Concluído para processamento local em 23 de outubro de 2026, com duas revisões independentes e CI remota aprovada.
 
 Esta etapa segue o passo 3 do roteiro Word: ampliar instrumentos e identificadores, usar calendários explícitos, validar moedas e contratos, ingerir splits/dividendos e distinguir preços brutos de preços ajustados. Notícias e IA pertencem ao passo 7 do roteiro de 13 etapas.
 
@@ -82,3 +82,19 @@ As duas revisões independentes aprovaram o snapshot final sem bloqueantes reman
 O parecer financeiro também confirmou identidade imutável de opções, fatores de split/dividendo, referência da sessão anterior, volume inverso, limites por disponibilidade/ingestão, cobertura obrigatória e preservação das barras brutas. Os dois avisos de dependências são deprecações já conhecidas, sem falhas de testes. O código aprovado corresponde ao snapshot SHA-256 6bcf8b5bee6c8b18990c4491389f3a23abea6d6fe603b79e4e368d3781fcd152, registrado localmente em artifacts/catalog-source-snapshot-20261022.json.
 
 O bloqueio de cota descrito nos registros anteriores foi superado. O aceite cobre o processamento local, sem certificar cobertura mundial de fornecedores, novos calendários ou retorno total. Publicação, CI remota e atualização do ambiente local serão registradas com seus resultados efetivos.
+
+
+## Atualização do ambiente local — 23/10/2026
+
+Após as duas aprovações, o ambiente capitaloidc recebeu a migração 0003 e iniciou com API, web, worker, PostgreSQL, Redis e Keycloak saudáveis. O check de configuração confirmou issuer exato, PKCE S256 e rejeição de sessão anônima. A aplicação está em http://localhost:13000/login.
+
+Antes da atualização foi criado oidc-pre-step3-20261023T101725Z.dump e sua restauração confirmou 18 tabelas na revisão 0002. Após a atualização, uma nova restauração em banco descartável permitiu comparar todas as linhas antigas nas 17 tabelas de dados, projetadas nas colunas antigas: valores originais, UUIDs, 1.800 barras, três usuários, duas watchlists e uma regra foram preservados. A única exceção esperada nessa comparação é assets.updated_at, avançado pelo enriquecimento de metadados. O relatório local é artifacts/catalog-primary-preservation-20261023.json.
+
+O seed acrescentou SPLIT-DEMO com 40 barras e dois eventos. As duas importações manuais verificadas acrescentaram GOOG, GOOGL, BRK.A e BRK.B, chegando a 20 instrumentos, sem inventar cotações para esses quatro. O backup posterior oidc-post-step3-20261023T102317Z.dump teve restauração verificada das 20 tabelas na revisão 0003, já incluindo as importações. Os dumps e configurações locais continuam ignorados pelo Git. O arquivo Word do operador foi preservado.
+
+O código foi publicado no PR 2, baseado no PR 1 de autenticação, sem merge ou deploy em produção. A execução remota 39938471944 está em validação; o registro final de CI será incluído após conclusão.
+
+
+## Conclusão — 23/10/2026
+
+O passo 3 está concluído no escopo local documentado. A execução remota 39938471944 terminou com checks e oidc em success no commit 32b2007ffde27933475e9519c9b8d076d730c8e3. Os resultados confirmam 186 testes backend, nove operacionais, 26 cenários DEMO e 21 OIDC, build e validação de dados/infraestrutura. Registro em docs/catalog-ci-validation.md. As pendências e o bloqueio de cota registrados acima são históricos e foram resolvidos; as dependências externas permanecem nas etapas posteriores.

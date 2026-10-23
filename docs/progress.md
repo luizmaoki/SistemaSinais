@@ -133,3 +133,13 @@ A branch local codex/catalog-data-integrity preserva as alterações ainda sem c
 ## Passo 3 — duas revisões aprovadas em 23/10/2026
 
 A revisão de contratos, compatibilidade e reversão aprovou o código final após repetir 21 testes. A revisão financeira e de dados também aprovou, repetindo 42 testes sem rede, incluindo as provas independentes das correções de ingestão e alertas. Não há bloqueantes remanescentes nos pareceres. Os 82 hashes correspondem ao snapshot final testado; cobertura externa de dados continua fora desse aceite. Publicação/CI e atualização local serão registradas após execução.
+
+
+## Passo 3 — ambiente local atualizado em 23/10/2026
+
+Migração 0003 aplicada ao capitaloidc após backup e duas aprovações. A conferência contra uma restauração da revisão 0002 confirmou os dados antigos em 17 tabelas, com exceção apenas do timestamp assets.updated_at avançado pelo novo metadado. Foram preservados os 15 UUIDs originais, 1.800 barras, três usuários, duas watchlists e uma regra. O ambiente agora tem 20 instrumentos: piloto, SPLIT-DEMO e quatro classes verificadas importadas sem preços fictícios. Backup posterior com restauração das 20 tabelas verificado. Aplicação saudável em http://localhost:13000/login. PR 2 publicado; CI remota em andamento.
+
+
+## Passo 3 concluído em 23/10/2026
+
+As duas revisões independentes e a CI remota aprovaram o código 32b2007ffde27933475e9519c9b8d076d730c8e3. Execução 39938471944: checks e oidc em success, confirmando 186 testes backend, nove operacionais, 26 cenários DEMO e 21 OIDC, além de lint, tipagem, build, instalação limpa, migração/restauração, persistência, logs e worker. O ambiente local está saudável na revisão 0003, com dados anteriores preservados e backups anterior/posterior restaurados e conferidos. O PR 2 está disponível sem merge; depende do PR 1 ainda aberto. Evidências em docs/catalog-ci-validation.md. O próximo passo é integrar preços reais autorizados; isso ainda exige fornecedor, cobertura, licença e credenciais.

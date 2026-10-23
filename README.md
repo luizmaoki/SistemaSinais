@@ -47,7 +47,7 @@ O roteiro de 13 etapas segue o arquivo Word do projeto:
 
 1. Consolidar a fundação — concluído.
 2. Implementar autenticação real — concluído para desenvolvimento local.
-3. Completar catálogo e integridade dos dados — em implementação; veja docs/catalog-step-3.md.
+3. Completar catálogo e integridade dos dados — concluído para processamento local; veja docs/catalog-step-3.md.
 4. Adicionar preços reais autorizados.
 5. Completar dashboard, gráficos e scanner.
 6. Completar macro e disclosures.
@@ -71,3 +71,8 @@ CI remota da fundação aprovada em 13/10/2026: https://github.com/luizmaoki/Sis
 Ambiente separado: python scripts/oidc_local.py up. Acesse http://localhost:13000/login. Contas de teste, comandos e limites em [docs/auth-step-2.md](docs/auth-step-2.md). O login não altera a classificação DEMO das séries financeiras.
 
 CI remota do passo 2 aprovada em 17/10/2026: [evidências](docs/auth-ci-validation.md). Login OIDC, isolamento, migração e regressão demo validados; [PR 1](https://github.com/luizmaoki/SistemaSinais/pull/1).
+
+
+## Passo 3 — catálogo e integridade
+
+Concluído com duas revisões independentes e CI remota aprovada em 23/10/2026: [evidências](docs/catalog-ci-validation.md). Catálogo com UUIDs/aliases, calendários, importações versionadas e ajustes corporativos preservando preços brutos. Procedimento, cobertura e dependências em [docs/catalog-step-3.md](docs/catalog-step-3.md); [PR 2](https://github.com/luizmaoki/SistemaSinais/pull/2).
