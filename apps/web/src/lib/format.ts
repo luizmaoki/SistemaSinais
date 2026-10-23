@@ -1,8 +1,9 @@
-import type { DataMode } from "@capital-intelligence/shared-types";
+import type { DataMode, SeriesAdjustment } from "@capital-intelligence/shared-types";
 export const locale = "pt-BR";
 export const timezone = "America/Sao_Paulo";
 export const number = (value: number | null | undefined, digits = 2) => value == null || !Number.isFinite(value) ? "—" : new Intl.NumberFormat(locale, { minimumFractionDigits: digits, maximumFractionDigits: digits }).format(value);
-export const price = (value: number | null | undefined, currency = "USD") => value == null || !Number.isFinite(value) ? "—" : new Intl.NumberFormat(locale, { style: "currency", currency, maximumFractionDigits: 2 }).format(value);
+export const price = (value: number | null | undefined, currency?: string | null) => value == null || !Number.isFinite(value) ? "—" : currency && /^[a-z]{3}$/i.test(currency) ? new Intl.NumberFormat(locale, { style: "currency", currency, maximumFractionDigits: 2 }).format(value) : number(value) + " (moeda não informada)";
+export const adjustmentLabel: Record<SeriesAdjustment, string> = { unadjusted: "Sem ajuste", split_adjusted: "Ajustada por desdobramentos", split_dividend_adjusted: "Ajustada por desdobramentos e dividendos" };
 export const percent = (value: number | null | undefined) => value == null || !Number.isFinite(value) ? "—" : (value > 0 ? "+" : "") + number(value) + "%";
 export function date(value?: string | null, withTime = true) {
   if (!value || !Number.isFinite(Date.parse(value))) return "Sem atualização";

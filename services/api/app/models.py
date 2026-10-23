@@ -72,12 +72,23 @@ class Asset(Base):
     delisted_at: Mapped[date | None] = mapped_column(Date)
     sector: Mapped[str | None] = mapped_column(String(100))
     cik: Mapped[str | None] = mapped_column(String(10), index=True)
+    calendar_id: Mapped[str | None] = mapped_column(String(30))
+    instrument_kind: Mapped[str | None] = mapped_column(String(30))
+    metadata_status: Mapped[str] = mapped_column(String(20), default="UNVERIFIED", server_default="UNVERIFIED")
+    metadata_source_id: Mapped[str | None] = mapped_column(String(50))
+    metadata_source_uri: Mapped[str | None] = mapped_column(Text)
+    metadata_available_as_of: Mapped[datetime | None] = mapped_column(UTCDateTime)
+    metadata_ingested_at: Mapped[datetime | None] = mapped_column(UTCDateTime)
     created_at: Mapped[datetime] = mapped_column(UTCDateTime, default=utcnow)
     updated_at: Mapped[datetime] = mapped_column(UTCDateTime, default=utcnow, onupdate=utcnow)
 
 
 class AssetIdentifier(Base):
     __tablename__ = "asset_identifiers"
+    __table_args__ = (
+        Index("ix_identifiers_lookup", "identifier_type", "value", "venue"),
+        Index("ix_identifiers_revision", "asset_id", "source_id", "native_id", "version", unique=True),
+    )
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
     asset_id: Mapped[str] = mapped_column(ForeignKey("assets.id"), index=True)
     identifier_type: Mapped[str] = mapped_column(String(30))
@@ -85,10 +96,34 @@ class AssetIdentifier(Base):
     effective_from: Mapped[date | None] = mapped_column(Date)
     effective_to: Mapped[date | None] = mapped_column(Date)
     source_id: Mapped[str] = mapped_column(String(50))
+    venue: Mapped[str | None] = mapped_column(String(100))
+    chain_id: Mapped[str | None] = mapped_column(String(30))
+    native_id: Mapped[str | None] = mapped_column(String(100))
+    version: Mapped[int | None] = mapped_column(Integer)
+    checksum: Mapped[str | None] = mapped_column(String(64))
+    cancelled: Mapped[bool] = mapped_column(Boolean, default=False, server_default="0")
+    source_uri: Mapped[str | None] = mapped_column(Text)
+    available_as_of: Mapped[datetime | None] = mapped_column(UTCDateTime)
+    ingested_at: Mapped[datetime | None] = mapped_column(UTCDateTime)
+
+
+class CatalogImport(Base):
+    __tablename__ = "catalog_imports"
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
+    checksum: Mapped[str] = mapped_column(String(64), unique=True)
+    source_id: Mapped[str] = mapped_column(String(50))
+    source_uri: Mapped[str] = mapped_column(Text)
+    available_as_of: Mapped[datetime] = mapped_column(UTCDateTime)
+    ingested_at: Mapped[datetime] = mapped_column(UTCDateTime)
+    asset_count: Mapped[int] = mapped_column(Integer)
+    payload: Mapped[dict] = mapped_column(JSON)
 
 
 class CorporateAction(Base):
     __tablename__ = "asset_corporate_actions"
+    __table_args__ = (
+        Index("ix_actions_revision", "asset_id", "source_id", "data_mode", "native_id", "version", unique=True),
+    )
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
     asset_id: Mapped[str] = mapped_column(ForeignKey("assets.id"), index=True)
     action_type: Mapped[str] = mapped_column(String(40))
@@ -96,6 +131,33 @@ class CorporateAction(Base):
     details: Mapped[dict] = mapped_column(JSON)
     source_id: Mapped[str] = mapped_column(String(50))
     data_mode: Mapped[str] = mapped_column(String(30))
+    native_id: Mapped[str | None] = mapped_column(String(100))
+    version: Mapped[int | None] = mapped_column(Integer)
+    checksum: Mapped[str | None] = mapped_column(String(64))
+    source_uri: Mapped[str | None] = mapped_column(Text)
+    available_as_of: Mapped[datetime | None] = mapped_column(UTCDateTime)
+    ingested_at: Mapped[datetime | None] = mapped_column(UTCDateTime)
+    cancelled: Mapped[bool] = mapped_column(Boolean, default=False, server_default="0")
+
+
+class CorporateActionCoverage(Base):
+    __tablename__ = "corporate_action_coverage"
+    __table_args__ = (
+        UniqueConstraint("asset_id", "source_id", "data_mode", "dataset_id", "version"),
+    )
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
+    asset_id: Mapped[str] = mapped_column(ForeignKey("assets.id"), index=True)
+    source_id: Mapped[str] = mapped_column(String(50))
+    data_mode: Mapped[str] = mapped_column(String(30))
+    dataset_id: Mapped[str] = mapped_column(String(100))
+    version: Mapped[int] = mapped_column(Integer)
+    coverage_from: Mapped[date] = mapped_column(Date)
+    coverage_to: Mapped[date] = mapped_column(Date)
+    complete: Mapped[bool] = mapped_column(Boolean)
+    checksum: Mapped[str] = mapped_column(String(64))
+    source_uri: Mapped[str] = mapped_column(Text)
+    available_as_of: Mapped[datetime] = mapped_column(UTCDateTime)
+    ingested_at: Mapped[datetime] = mapped_column(UTCDateTime)
 
 
 class MarketBar(Base):
@@ -118,6 +180,7 @@ class MarketBar(Base):
     data_mode: Mapped[str] = mapped_column(String(30))
     evidence_kind: Mapped[str] = mapped_column(String(20), default="OBSERVED")
     adjustment: Mapped[str] = mapped_column(String(30), default="unadjusted")
+    currency: Mapped[str | None] = mapped_column(String(8))
     source_uri: Mapped[str | None] = mapped_column(Text)
     available_as_of: Mapped[datetime] = mapped_column(UTCDateTime)
     ingested_at: Mapped[datetime] = mapped_column(UTCDateTime, default=utcnow)

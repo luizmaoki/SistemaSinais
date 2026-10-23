@@ -17,6 +17,7 @@ def evaluate_alerts(session):
 
     insert = pg_insert if session.get_bind().dialect.name == "postgresql" else sqlite_insert
     created = 0
+    cutoff = utcnow()
     for rule in session.scalars(
         select(AlertRule).join(User, User.id == AlertRule.user_id).where(
             AlertRule.enabled.is_(True), User.active.is_(True), User.tenant_id == AlertRule.tenant_id,
@@ -29,13 +30,19 @@ def evaluate_alerts(session):
             .where(
                 MarketBar.asset_id == rule.asset_id,
                 MarketBar.source_id == rule.source_id,
-                MarketBar.available_as_of <= utcnow(),
-                MarketBar.close_time <= utcnow(),
+                MarketBar.available_as_of <= cutoff,
+                MarketBar.close_time <= cutoff,
+                MarketBar.ingested_at <= cutoff,
+                MarketBar.adjustment == "unadjusted",
+                MarketBar.timeframe == "1d",
             )
             .order_by(MarketBar.event_time.desc())
             .limit(1)
         )
         if not bar or (bar.source_id != "demo" and bar.close_time < utcnow() - timedelta(days=2)):
+            continue
+        asset = session.get(Asset, rule.asset_id)
+        if asset is None or not bar.currency or bar.currency != asset.currency or bar.close <= 0:
             continue
         matches = bar.close > rule.threshold if rule.direction == "above" else bar.close < rule.threshold
         if matches:
@@ -107,6 +114,14 @@ def persist_events(session, asset, events):
             )
         elif event.event_type == "daily_bar":
             p = event.payload
+            # Provider evidence declares the denomination; metadata only validates it.
+            if not p.get("currency") or p["currency"] != asset.currency:
+                raise ProviderError("PROVIDER_CURRENCY_MISMATCH", event.source_id, "Moeda do candle ausente ou incompatível com o instrumento; lote não persistido.")
+            if event.source_id == "coinbase":
+                product = CoinbaseAdapter.product_for_asset(asset)
+                if product is None or p.get("provider_product") != product or p.get("provider_asset_id") != asset.id:
+                    raise ProviderError("PROVIDER_IDENTITY_MISMATCH", event.source_id, "Produto sem vínculo explícito com este instrumento; lote não persistido.")
+            bar_values = {key: value for key, value in p.items() if key not in {"provider_product", "provider_asset_id"}}
             existing = session.scalar(
                 select(MarketBar.id).where(
                     MarketBar.asset_id == asset.id,
@@ -120,7 +135,7 @@ def persist_events(session, asset, events):
                 MarketBar(
                     asset_id=asset.id,
                     source_id=event.source_id,
-                    **p,
+                    **bar_values,
                     data_mode=event.data_mode,
                     evidence_kind=event.evidence_kind,
                     source_uri=event.source_uri,
@@ -162,6 +177,10 @@ async def sync_provider(provider_id):
                     else select(Asset).where(Asset.asset_type == "crypto")
                 )
             )
+            if provider_id == "coinbase":
+                assets = [asset for asset in assets if CoinbaseAdapter.product_for_asset(asset) is not None]
+                if not assets:
+                    raise ProviderError("ASSET_MAPPING_UNAVAILABLE", provider_id, "Nenhum instrumento possui vínculo válido com o piloto Coinbase.")
             for asset in assets:
                 query = NormalizedQuery(asset_id=asset.id, symbol=asset.symbol, cik=asset.cik)
                 events = await adapter.normalize(await adapter.fetch(query))

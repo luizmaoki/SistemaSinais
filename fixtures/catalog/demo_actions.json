@@ -1,0 +1,39 @@
+{
+  "schema_version": 1,
+  "asset_id": "46c77014-7d43-5613-b8e7-6e71ca081111",
+  "source_id": "demo",
+  "source_uri": "fixture:split_demo_actions_v1",
+  "data_mode": "DEMO",
+  "dataset_id": "split-demo-2026",
+  "version": 1,
+  "available_as_of": "2026-02-27T21:00:00Z",
+  "coverage": {
+    "from": "2025-12-31",
+    "to": "2026-02-27",
+    "complete": true
+  },
+  "events": [
+    {
+      "native_id": "split-20260202",
+      "version": 1,
+      "action_type": "split",
+      "effective_date": "2026-02-02",
+      "details": {
+        "new_shares": "2",
+        "old_shares": "1"
+      },
+      "available_as_of": "2026-01-30T21:00:00Z"
+    },
+    {
+      "native_id": "dividend-20260203",
+      "version": 1,
+      "action_type": "cash_dividend",
+      "effective_date": "2026-02-03",
+      "details": {
+        "amount": "1",
+        "currency": "USD"
+      },
+      "available_as_of": "2026-02-02T21:00:00Z"
+    }
+  ]
+}

@@ -4,14 +4,51 @@ export type EvidenceKind = "OBSERVED" | "REPORTED" | "ESTIMATED" | "INFERRED" | 
 export interface Collection<T> { items: T[]; data_mode?: DataMode; source_id?: string; }
 export interface Asset {
   id: string; symbol: string; display_name: string; name?: string; asset_type: string;
-  currency: string; venue: string; timezone?: string; latest_price?: number | null;
+  currency: string | null; venue: string; timezone?: string | null; latest_price?: number | null;
   change_pct?: number | null; data_mode?: DataMode; source_id?: string; updated_at?: string | null;
+  primary_exchange?: string | null; mic?: string | null; calendar_id?: string | null;
+  instrument_identifier?: string | null; instrument_kind?: "root" | "contract" | "spot" | null;
+  underlying_asset_id?: string | null; contract_multiplier?: number | null;
+  option_type?: string | null; strike?: number | null; expiration?: string | null;
+  chain_id?: string | null; contract_address?: string | null; status?: string | null;
+  listed_at?: string | null; delisted_at?: string | null; sector?: string | null;
+  metadata_status?: string | null; metadata_source_id?: string | null; metadata_source_uri?: string | null;
+  metadata_available_as_of?: string | null; metadata_ingested_at?: string | null;
 }
 export interface AssetPage extends Collection<Asset> { total: number; page: number; page_size: number; }
+export interface AssetIdentifier {
+  id: string; asset_id: string; identifier_type: string; value: string;
+  effective_from: string | null; effective_to: string | null; source_id: string;
+  source_uri?: string | null; available_as_of?: string | null; ingested_at?: string | null;
+  version?: number | null; data_mode?: DataMode; cancelled?: boolean; venue?: string | null; chain_id?: string | null;
+}
+export interface TradingSession { session_date: string; open_at: string; close_at: string; }
+export interface AssetCalendar extends Collection<TradingSession> {
+  calendar_id: string | null; timezone: string | null; currency: string | null;
+  status: "AVAILABLE" | "UNAVAILABLE"; reason?: string | null; as_of?: string;
+}
+export interface CorporateAction {
+  id: string; asset_id: string; action_type: string; effective_at: string;
+  details: Record<string, unknown>; source_id: string; source_uri: string | null;
+  data_mode: DataMode; available_as_of: string | null; ingested_at: string | null; version: number | null; cancelled?: boolean; effective_date?: string;
+}
+export interface CorporateActions extends Collection<CorporateAction> {
+  coverage: { from: string; to: string; source_id: string; data_mode: DataMode } | null;
+}
+export type SeriesAdjustment = "unadjusted" | "split_adjusted" | "split_dividend_adjusted";
+export interface SeriesProvenance {
+  data_mode: DataMode; source_id: string; as_of?: string | null; last_observation_at?: string | null;
+  adjustment: SeriesAdjustment; adjustment_methodology?: string; action_source_id?: string | null; currency: string | null;
+  calendar_id?: string | null;
+}
 export interface Bar { close_time: string; time: string; open: number; high: number; low: number; close: number; volume: number; source_id: string; data_mode: DataMode; }
-export interface Bars extends Collection<Bar> { data_mode: DataMode; source_id: string; as_of?: string; adjustment?: string; }
+export interface Bars extends Collection<Bar>, SeriesProvenance { data_mode: DataMode; source_id: string; }
 export interface MonthlyReturn { month: string; return_pct: number | null; partial: boolean; reason?: string | null; observations?: number; expected_observations?: number; gaps?: string[]; }
-export interface Returns extends Collection<MonthlyReturn> { data_mode: DataMode; source_id: string; as_of?: string; methodology?: string; }
+export interface Returns extends Collection<MonthlyReturn>, SeriesProvenance { data_mode: DataMode; source_id: string; methodology?: string; calculation_status?: "AVAILABLE" | "UNAVAILABLE"; reason?: string | null; }
+export interface SeriesMetrics extends SeriesProvenance {
+  sma_20?: number | null; sma_50?: number | null; rsi_14?: number | null; max_drawdown_pct?: number | null;
+  calculation_status?: "AVAILABLE" | "UNAVAILABLE"; frequency_quality?: string;
+}
 export interface Provider {
   id: string; provider_id?: string; name: string; dataset: string; status: string; data_mode: DataMode;
   last_success_at?: string | null; last_error?: string | null; documentation_url?: string;
@@ -20,7 +57,7 @@ export interface Provider {
 }
 export interface Watchlist { id: string; name: string; asset_ids: string[]; assets: Asset[]; }
 export interface AlertRule { source_id?: string; id: string; asset_id: string; threshold: number; direction: "above" | "below"; enabled?: boolean; created_at?: string; data_mode?: DataMode; }
-export interface Alert { observed_price?: number; threshold?: number; event_time?: string; available_as_of?: string; id: string; asset_id?: string; title?: string; message?: string; created_at?: string; triggered_at?: string; data_mode?: DataMode; source_id?: string; evidence_kind?: EvidenceKind; }
+export interface Alert { observed_price?: number; observed_currency?: string | null; threshold?: number; event_time?: string; available_as_of?: string; id: string; asset_id?: string; title?: string; message?: string; created_at?: string; triggered_at?: string; data_mode?: DataMode; source_id?: string; evidence_kind?: EvidenceKind; }
 export interface Filing {
   id: string; asset_id?: string | null; company_name?: string; symbol?: string; form: string; cik: string;
   accession_number?: string; source_id: string; source_uri: string; published_at?: string;

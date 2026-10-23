@@ -1,10 +1,12 @@
 import time
 from contextlib import asynccontextmanager
-from datetime import datetime, timedelta
+from datetime import date, datetime, timedelta
+from dataclasses import asdict, is_dataclass
+from zoneinfo import ZoneInfo
 from decimal import Decimal
 from typing import Literal
 from uuid import UUID, uuid4
-from fastapi import Depends, FastAPI, Query, Request
+from fastapi import Depends, FastAPI, HTTPException, Query, Request
 from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 from starlette.middleware.trustedhost import TrustedHostMiddleware
@@ -15,11 +17,15 @@ from sqlalchemy.orm import Session
 from app.auth import Principal, get_principal, require_writer
 from app.auth_routes import router as auth_router
 from app.calculations import monthly_returns, technical_metrics
+from app.calendars import CalendarUnavailable, SUPPORTED_CALENDARS, session_schedule
+from app.catalog import normalized_identifier, resolve_identifiers, visible_identifiers
+from app.corporate_actions import latest_actions, latest_coverage
+from app.adjustments import AdjustmentUnavailable, METHODOLOGY, adjust_series, has_coverage
 from app.config import get_settings
 from app.database import get_db, utcnow
 from app.errors import api_error
 from app.ingestion import evaluate_alerts
-from app.models import Alert, AlertRule, Asset, AuditLog, Filing, MacroEvent, MarketBar, Watchlist, WatchlistAsset
+from app.models import Alert, AlertRule, Asset, AssetIdentifier, AuditLog, Filing, MacroEvent, MarketBar, Watchlist, WatchlistAsset
 from app.providers import provider_rows
 from app.logging_config import application_logger
 
@@ -104,10 +110,17 @@ authenticated = [Depends(get_principal)]
 
 
 def record(obj):
-    return {
-        column.name: float(value) if isinstance(value := getattr(obj, column.name), Decimal) else value
-        for column in obj.__table__.columns
-    }
+    values = asdict(obj) if is_dataclass(obj) else {column.name: getattr(obj, column.name) for column in obj.__table__.columns}
+    return {key: float(value) if isinstance(value, Decimal) else value for key, value in values.items()}
+
+
+def knowledge_time(value=None):
+    now = utcnow()
+    if value is not None and value.tzinfo is None:
+        raise api_error(422, "TIMEZONE_REQUIRED", "Inclua timezone no instante de conhecimento.")
+    if value is not None and value > now:
+        raise api_error(422, "FUTURE_AS_OF", "O instante de conhecimento não pode estar no futuro.")
+    return value or now
 
 
 def get_asset(session, asset_id):
@@ -117,15 +130,19 @@ def get_asset(session, asset_id):
     return asset
 
 
-def series(session, asset_id, source_id="demo", start=None, end=None):
+def series(session, asset_id, source_id="demo", start=None, end=None, as_of=None):
     asset = get_asset(session, asset_id)
     if source_id == "coinbase" and not settings.coinbase_personal_use_accepted:
         raise api_error(503, "PROVIDER_NOT_CONFIGURED", "Coinbase não configurada; aceite pessoal necessário.")
+    cutoff = as_of or utcnow()
     query = select(MarketBar).where(
         MarketBar.asset_id == asset.id,
         MarketBar.source_id == source_id,
-        MarketBar.close_time <= utcnow(),
-        MarketBar.available_as_of <= utcnow(),
+        MarketBar.close_time <= cutoff,
+        MarketBar.available_as_of <= cutoff,
+        MarketBar.ingested_at <= cutoff,
+        MarketBar.adjustment == "unadjusted",
+        MarketBar.timeframe == "1d",
     )
     if start:
         query = query.where(MarketBar.close_time >= start)
@@ -138,20 +155,43 @@ def series(session, asset_id, source_id="demo", start=None, end=None):
 def mode_for(bars):
     if not bars:
         return "UNAVAILABLE"
-    if bars[-1].source_id == "demo":
+    if bars[-1].data_mode == "DEMO":
         return "DEMO"
     return "STALE" if bars[-1].close_time < utcnow() - timedelta(days=2) else "END_OF_DAY"
+
+
+def series_currency(asset, bars):
+    """Use observed denominations; catalog metadata cannot fill an unknown bar currency."""
+    currencies = {bar.currency for bar in bars}
+    if not currencies:
+        return asset.currency, None
+    if len(currencies) > 1:
+        return None, "SERIES_CURRENCY_MISMATCH"
+    currency = next(iter(currencies))
+    if not currency:
+        return None, "CURRENCY_UNAVAILABLE"
+    if currency != asset.currency:
+        return None, "SERIES_CURRENCY_MISMATCH"
+    return currency, None
 
 
 def asset_row(asset, session):
     result = record(asset)
     _, bars = series(session, asset.id)
+    quote_currency, reason = series_currency(asset, bars)
+    reason = reason or ("NO_CLOSED_RAW_BARS" if not bars else None)
+    if bars and bars[-1].close <= 0:
+        reason = reason or "INVALID_PRICE"
+    available = reason is None
     result.update(
-        latest_price=float(bars[-1].close) if bars else None,
-        change_pct=(float(bars[-1].close / bars[-2].close - 1) * 100) if len(bars) >= 2 else None,
-        data_mode=mode_for(bars),
+        latest_price=float(bars[-1].close) if available else None,
+        change_pct=(float((bars[-1].close / bars[-2].close - 1) * 100)) if available and len(bars) >= 2 and bars[-2].close > 0 else None,
+        data_mode=mode_for(bars) if available else "UNAVAILABLE",
         source_id="demo" if bars else None,
         updated_at=bars[-1].close_time if bars else None,
+        quote_currency=quote_currency if available else None,
+        quote_status="AVAILABLE" if available else "UNAVAILABLE",
+        quote_reason=reason,
     )
     return result
 
@@ -179,6 +219,7 @@ def assets(
     q: str = Query("", max_length=100),
     asset_class: str | None = Query(None, alias="class", max_length=40),
     venue: str | None = Query(None, max_length=100),
+    currency: str | None = Query(None, max_length=8),
     page: int = Query(1, ge=1),
     page_size: int = Query(20, ge=1, le=100),
     db: Session = Depends(get_db),
@@ -188,15 +229,41 @@ def assets(
         # LIKE metacharacters escaped; query stays parametrized.
         needle = q.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
         query = query.where(
-            Asset.symbol.ilike(f"%{needle}%", escape="\\") | Asset.display_name.ilike(f"%{needle}%", escape="\\")
+            Asset.symbol.ilike(f"%{needle}%", escape="\\") | Asset.display_name.ilike(f"%{needle}%", escape="\\") | Asset.id.in_(select(AssetIdentifier.asset_id).where(AssetIdentifier.value.ilike(f"%{needle}%", escape="\\")))
         )
     if asset_class:
         query = query.where(Asset.asset_type == asset_class)
     if venue:
         query = query.where(Asset.venue == venue)
+    if currency:
+        query = query.where(Asset.currency == currency)
     total = db.scalar(select(func.count()).select_from(query.subquery()))
-    rows = db.scalars(query.order_by(Asset.symbol).offset((page - 1) * page_size).limit(page_size))
+    rows = db.scalars(query.order_by(Asset.symbol, Asset.venue, Asset.id).offset((page - 1) * page_size).limit(page_size))
     return {"items": [asset_row(asset, db) for asset in rows], "total": total, "page": page, "page_size": page_size}
+
+
+@app.get(PREFIX + "/assets/resolve", dependencies=authenticated)
+def resolve_asset(
+    identifier_type: Literal["ticker", "cik", "isin", "figi", "cusip", "vendor", "contract_address"],
+    value: str = Query(min_length=1, max_length=100),
+    venue: str | None = Query(None, max_length=100),
+    chain_id: str | None = Query(None, max_length=30),
+    as_of: date | None = None,
+    known_at: datetime | None = None,
+    db: Session = Depends(get_db),
+):
+    known = knowledge_time(known_at)
+    effective = as_of or known.date()
+    try:
+        normalized = normalized_identifier(identifier_type, value)
+    except ValueError as error:
+        raise api_error(422, "INVALID_IDENTIFIER", str(error)) from None
+    candidates = resolve_identifiers(db, identifier_type, normalized, effective, known, venue, chain_id)
+    if len(candidates) > 1:
+        raise HTTPException(409, detail={"code": "AMBIGUOUS_IDENTIFIER", "message": "Identificador corresponde a mais de um instrumento; informe escopo e vigência.", "candidate_ids": candidates})
+    if not candidates:
+        raise api_error(404, "IDENTIFIER_NOT_FOUND", "Nenhum identificador conhecido e vigente corresponde à consulta.")
+    return {"asset_id": candidates[0], "asset": asset_row(get_asset(db, candidates[0]), db), "identifier_type": identifier_type, "value": normalized, "as_of": effective, "known_at": known}
 
 
 @app.get(PREFIX + "/assets/{asset_id}", dependencies=authenticated)
@@ -204,59 +271,154 @@ def asset_detail(asset_id: UUID, db: Session = Depends(get_db)):
     return asset_row(get_asset(db, asset_id), db)
 
 
-@app.get(PREFIX + "/assets/{asset_id}/bars", dependencies=authenticated)
-def bars_endpoint(
-    asset_id: UUID,
-    source: Literal["demo", "coinbase"] = "demo",
-    timeframe: Literal["1d"] = "1d",
-    start: datetime | None = Query(None, alias="from"),
-    end: datetime | None = Query(None, alias="to"),
+@app.get(PREFIX + "/assets/{asset_id}/identifiers", dependencies=authenticated)
+def identifiers(asset_id: UUID, known_at: datetime | None = None, db: Session = Depends(get_db)):
+    get_asset(db, asset_id)
+    known = knowledge_time(known_at)
+    return {"items": [record(row) for row in visible_identifiers(db, known, asset_id)], "known_at": known}
+
+
+@app.get(PREFIX + "/assets/{asset_id}/calendar", dependencies=authenticated)
+def asset_calendar(
+    asset_id: UUID, start: date = Query(alias="from"), end: date = Query(alias="to"),
     db: Session = Depends(get_db),
 ):
-    for stamp in [start, end]:
+    asset = get_asset(db, asset_id)
+    if not 0 <= (end - start).days <= 365:
+        raise api_error(422, "INVALID_RANGE", "O intervalo deve conter de 1 a 366 dias, incluindo os limites.")
+    response = {"calendar_id": asset.calendar_id, "timezone": asset.timezone, "currency": asset.currency, "as_of": utcnow()}
+    try:
+        if asset.calendar_id and SUPPORTED_CALENDARS.get(asset.calendar_id) != asset.timezone:
+            raise CalendarUnavailable("CALENDAR_TIMEZONE_MISMATCH")
+        schedule = session_schedule(start, end, asset.calendar_id)
+    except CalendarUnavailable as error:
+        return {**response, "status": "UNAVAILABLE", "reason": str(error), "items": []}
+    return {**response, "status": "AVAILABLE", "reason": None, "items": [{"session_date": day, "open_at": times[0], "close_at": times[1]} for day, times in schedule.items()]}
+
+
+@app.get(PREFIX + "/assets/{asset_id}/corporate-actions", dependencies=authenticated)
+def corporate_actions(
+    asset_id: UUID, source: str = Query("demo", pattern=r"^[a-z][a-z0-9_-]{0,49}$"),
+    as_of: datetime | None = None, db: Session = Depends(get_db),
+):
+    asset = get_asset(db, asset_id)
+    cutoff = knowledge_time(as_of)
+    mode = "DEMO" if source.startswith("demo") else "END_OF_DAY"
+    actions = latest_actions(db, asset.id, source, mode, cutoff, include_cancelled=True)
+    intervals = latest_coverage(db, asset.id, source, mode, cutoff)
+    complete = [r for r in intervals if r.complete]
+    coverage = None
+    if complete and has_coverage(complete, min(r.coverage_from for r in complete), max(r.coverage_to for r in complete)):
+        coverage = {"from": min(r.coverage_from for r in complete), "to": max(r.coverage_to for r in complete), "source_id": source, "data_mode": mode, "complete": True}
+    return {"items": [{**record(row), "effective_date": row.effective_at.astimezone(ZoneInfo(asset.timezone)).date(), "evidence_kind": "SIMULATED" if mode == "DEMO" else "REPORTED"} for row in actions], "coverage": coverage, "coverage_intervals": [record(row) for row in intervals], "source_id": source, "data_mode": mode, "as_of": cutoff}
+
+
+Adjustment = Literal["unadjusted", "split_adjusted", "split_dividend_adjusted"]
+
+
+def requested_series(db, asset_id, source, adjustment, as_of, action_source, start=None, end=None):
+    cutoff = knowledge_time(as_of)
+    for stamp in (start, end):
         if stamp and stamp.tzinfo is None:
             raise api_error(422, "TIMEZONE_REQUIRED", "Inclua timezone nos filtros de data.")
     if start and end and start > end:
         raise api_error(422, "INVALID_RANGE", "Data inicial posterior à final.")
-    asset, bars = series(db, asset_id, source, start, end)
-    mode = mode_for(bars)
-    return {
-        "items": [{**record(bar), "time": bar.event_time, "data_mode": mode} for bar in bars],
-        "data_mode": mode,
-        "source_id": source,
-        "as_of": utcnow(),
-        "currency": asset.currency,
-        "adjustment": "unadjusted",
-        "timeframe": timeframe,
+    asset, raw = series(db, asset_id, source, start, end, cutoff)
+    currency, currency_reason = series_currency(asset, raw)
+    if currency_reason == "SERIES_CURRENCY_MISMATCH":
+        raise api_error(409, "SERIES_CURRENCY_MISMATCH", "Série contém moedas inconsistentes; conversão cambial indisponível.")
+    try:
+        bars = adjust_series(db, asset, raw, adjustment, action_source or source, cutoff)
+    except AdjustmentUnavailable as error:
+        raise HTTPException(409, detail={"code": "ADJUSTMENT_UNAVAILABLE", "message": "Ajuste indisponível para esta série e instante de conhecimento.", "reason": str(error)}) from None
+    return asset, bars, {
+        "data_mode": mode_for(bars), "source_id": source, "as_of": cutoff,
+        "last_observation_at": bars[-1].close_time if bars else None,
+        "currency": currency,
+        "calendar_id": asset.calendar_id, "adjustment": adjustment,
+        "adjustment_status": "AVAILABLE", "adjustment_methodology": METHODOLOGY[adjustment],
+        "action_source_id": (action_source or source) if adjustment != "unadjusted" else None,
     }
+
+
+@app.get(PREFIX + "/assets/{asset_id}/bars", dependencies=authenticated)
+def bars_endpoint(
+    asset_id: UUID,
+    source: str = Query("demo", pattern=r"^[a-z][a-z0-9_-]{0,49}$"),
+    timeframe: Literal["1d"] = "1d", adjustment: Adjustment = "unadjusted",
+    as_of: datetime | None = None,
+    corporate_action_source: str | None = Query(None, pattern=r"^[a-z][a-z0-9_-]{0,49}$"),
+    start: datetime | None = Query(None, alias="from"), end: datetime | None = Query(None, alias="to"),
+    db: Session = Depends(get_db),
+):
+    _, bars, metadata = requested_series(db, asset_id, source, adjustment, as_of, corporate_action_source, start, end)
+    return {"items": [{**record(bar), "time": bar.event_time, "data_mode": metadata["data_mode"]} for bar in bars], **metadata, "timeframe": timeframe}
+
+
+def calculation_availability(asset, bars, currency):
+    _, currency_reason = series_currency(asset, bars)
+    if currency_reason:
+        return currency_reason
+    if asset.calendar_id not in SUPPORTED_CALENDARS or asset.timezone != SUPPORTED_CALENDARS.get(asset.calendar_id):
+        return "CALENDAR_UNAVAILABLE"
+    if not bars:
+        return "NO_CLOSED_RAW_BARS"
+    if currency is None:
+        return "CURRENCY_UNAVAILABLE"
+    tz = ZoneInfo(asset.timezone)
+    days = [bar.event_time.astimezone(tz).date() for bar in bars]
+    try:
+        # Monthly calculations need the preceding month as a return base too.
+        first = (min(days).replace(day=1) - timedelta(days=1)).replace(day=1)
+        last = (max(days).replace(day=28) + timedelta(days=4)).replace(day=1) - timedelta(days=1)
+        schedule = session_schedule(first, last, asset.calendar_id)
+    except CalendarUnavailable as error:
+        return str(error)
+    if len(days) != len(set(days)):
+        return "DUPLICATE_SESSIONS"
+    if any(day not in schedule or bar.close_time != schedule[day][1] or not schedule[day][0] <= bar.event_time < bar.close_time for day, bar in zip(days, bars)):
+        return "BAR_SESSION_MISMATCH"
+    if any(bar.close <= 0 or bar.volume < 0 for bar in bars):
+        return "INVALID_PRICE"
+    return None
 
 
 @app.get(PREFIX + "/assets/{asset_id}/returns", dependencies=authenticated)
 def returns_endpoint(
-    asset_id: UUID,
-    source: Literal["demo", "coinbase"] = "demo",
-    granularity: Literal["month"] = "month",
+    asset_id: UUID, source: str = Query("demo", pattern=r"^[a-z][a-z0-9_-]{0,49}$"),
+    granularity: Literal["month"] = "month", adjustment: Adjustment = "unadjusted",
+    as_of: datetime | None = None,
+    corporate_action_source: str | None = Query(None, pattern=r"^[a-z][a-z0-9_-]{0,49}$"),
     db: Session = Depends(get_db),
 ):
-    asset, bars = series(db, asset_id, source)
+    asset, bars, metadata = requested_series(db, asset_id, source, adjustment, as_of, corporate_action_source)
+    unavailable_reason = calculation_availability(asset, bars, metadata["currency"])
+    available = unavailable_reason is None
     return {
-        "items": monthly_returns(bars, asset.asset_type, asset.timezone, utcnow()),
-        "data_mode": mode_for(bars),
-        "source_id": source,
-        "as_of": utcnow(),
-        "methodology": "Último fechamento do mês / fechamento do mês anterior - 1; lacunas e meses parciais explícitos.",
+        "items": monthly_returns(bars, asset.asset_type, asset.timezone, metadata["as_of"], asset.calendar_id) if available else [],
+        **metadata, "calculation_status": "AVAILABLE" if available else "UNAVAILABLE",
+        "reason": unavailable_reason,
+        "methodology": "Último fechamento do mês / fechamento do mês anterior - 1; lacunas e meses parciais explícitos. Variação de preço na modalidade selecionada, sem retorno total/reinvestimento.",
     }
+
+
+def metrics_projection(asset, bars):
+    currency, _ = series_currency(asset, bars)
+    unavailable_reason = calculation_availability(asset, bars, currency)
+    if unavailable_reason is not None:
+        return {"calculation_status": "UNAVAILABLE", "frequency_quality": unavailable_reason, "volatility_reason": unavailable_reason}
+    return technical_metrics(bars, asset.asset_type, asset.calendar_id, asset.timezone)
 
 
 @app.get(PREFIX + "/assets/{asset_id}/metrics", dependencies=authenticated)
-def metrics(asset_id: UUID, source: Literal["demo", "coinbase"] = "demo", db: Session = Depends(get_db)):
-    asset, bars = series(db, asset_id, source)
-    return {
-        **technical_metrics(bars, asset.asset_type),
-        "data_mode": mode_for(bars),
-        "source_id": source,
-        "as_of": bars[-1].close_time if bars else None,
-    }
+def metrics(
+    asset_id: UUID, source: str = Query("demo", pattern=r"^[a-z][a-z0-9_-]{0,49}$"),
+    adjustment: Adjustment = "unadjusted", as_of: datetime | None = None,
+    corporate_action_source: str | None = Query(None, pattern=r"^[a-z][a-z0-9_-]{0,49}$"),
+    db: Session = Depends(get_db),
+):
+    asset, bars, metadata = requested_series(db, asset_id, source, adjustment, as_of, corporate_action_source)
+    return {**metrics_projection(asset, bars), **metadata}
 
 
 @app.get(PREFIX + "/providers", dependencies=authenticated)
@@ -273,7 +435,7 @@ def coverage(db: Session = Depends(get_db)):
                 "symbol": asset.symbol,
                 "catalog": True,
                 "real_quote": False,
-                "demo_bars": asset.asset_type in {"equity", "etf", "crypto"},
+                "demo_bars": bool(db.scalar(select(MarketBar.id).where(MarketBar.asset_id == asset.id, MarketBar.source_id == "demo").limit(1))),
                 "sec_filings": bool(asset.cik),
             }
             for asset in db.scalars(select(Asset))
@@ -289,10 +451,10 @@ def scanner(
     page_size: int = Query(20, ge=1, le=100),
     db: Session = Depends(get_db),
 ):
-    result = assets(q, asset_class, None, page, page_size, db)
+    result = assets(q=q, asset_class=asset_class, venue=None, currency=None, page=page, page_size=page_size, db=db)
     for row in result["items"]:
         asset, bars = series(db, row["id"])
-        row["metrics"] = technical_metrics(bars, asset.asset_type)
+        row["metrics"] = metrics_projection(asset, bars)
     return result
 
 
@@ -470,6 +632,9 @@ def create_rule(body: RuleInput, db: Session = Depends(get_db), principal: Princ
     asset, bars = series(db, body.asset_id, body.source_id)
     if not bars:
         raise api_error(503, "DATASET_UNAVAILABLE", "Série indisponível para esta regra.")
+    _, currency_reason = series_currency(asset, bars)
+    if currency_reason:
+        raise api_error(409, currency_reason, "Moeda da série ausente ou incompatível; regra não criada.")
     row = AlertRule(
         tenant_id=principal.tenant_id,
         user_id=principal.user_id,
@@ -509,9 +674,10 @@ def patch_rule(
 def alerts(db: Session = Depends(get_db), principal: Principal = Depends(get_principal)):
     return {
         "items": [
-            record(row)
-            for row in db.scalars(
-                select(Alert)
+            {**record(row), "observed_currency": observed_currency}
+            for row, observed_currency in db.execute(
+                select(Alert, MarketBar.currency)
+                .outerjoin(MarketBar, (MarketBar.id == Alert.bar_id) & (MarketBar.asset_id == Alert.asset_id) & (MarketBar.source_id == Alert.source_id))
                 .where(Alert.source_id != "coinbase" if not settings.coinbase_personal_use_accepted else True)
                 .where(Alert.tenant_id == principal.tenant_id, Alert.user_id == principal.user_id)
                 .order_by(Alert.created_at.desc())

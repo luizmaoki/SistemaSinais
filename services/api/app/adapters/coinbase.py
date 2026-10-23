@@ -1,5 +1,6 @@
 from datetime import datetime, timedelta, timezone
 from decimal import Decimal, InvalidOperation
+from uuid import NAMESPACE_URL, uuid5
 
 import httpx
 
@@ -12,7 +13,26 @@ class CoinbaseAdapter:
     """Daily, closed candles only. Personal-use opt-in is required; no AI/redistribution."""
 
     provider_id = "coinbase"
-    products = {"BTC-USD", "ETH-USD", "SOL-USD"}
+    # Explicit pilot bindings to the stable IDs created by the original catalog.
+    # Importing a similarly named token/listing must never expand this mapping.
+    listings = {
+        str(uuid5(NAMESPACE_URL, "capital-intelligence/Coinbase/" + product)): (product, "USD")
+        for product in ("BTC-USD", "ETH-USD", "SOL-USD")
+    }
+    products = {binding[0] for binding in listings.values()}
+
+    @classmethod
+    def product_for_asset(cls, asset):
+        binding = cls.listings.get(asset.id)
+        if binding is None:
+            return None
+        product, quote_currency = binding
+        if (asset.asset_type, asset.venue, asset.symbol, asset.currency, asset.instrument_kind, asset.timezone, asset.calendar_id) != ("crypto", "Coinbase", product, quote_currency, "spot", "UTC", "24/7"):
+            return None
+        if asset.contract_address or asset.chain_id or asset.underlying_asset_id:
+            return None
+        return product
+
 
     def __init__(self, personal_use_accepted: bool, timeout: float = 20.0, transport=None):
         self.personal_use_accepted = personal_use_accepted
@@ -32,7 +52,8 @@ class CoinbaseAdapter:
                 self.provider_id,
                 "Coinbase requer aceite local dos termos para uso pessoal; redistribuição e IA bloqueadas.",
             )
-        if query.symbol not in self.products:
+        binding = self.listings.get(query.asset_id)
+        if binding is None or query.symbol != binding[0]:
             raise ProviderError("DATASET_UNAVAILABLE", self.provider_id, "Produto não coberto pelo adapter.")
         now = utcnow()
         end = min(query.end or now, now).astimezone(timezone.utc)
@@ -71,6 +92,11 @@ class CoinbaseAdapter:
         seen = set()
         for event in events:
             try:
+                product = event.payload["product"]
+                listing = next(((asset_id, currency) for asset_id, (name, currency) in self.listings.items() if name == product), None)
+                if listing is None:
+                    raise ValueError("Unknown provider product")
+                provider_asset_id, quote_currency = listing
                 stamp, low, high, opened, close, volume = event.payload["candle"]
                 timestamp = datetime.fromtimestamp(int(stamp), timezone.utc)
                 end = timestamp + timedelta(days=1)
@@ -99,6 +125,9 @@ class CoinbaseAdapter:
                         evidence_kind="OBSERVED",
                         data_mode="END_OF_DAY",
                         payload={
+                            "provider_asset_id": provider_asset_id,
+                            "provider_product": product,
+                            "currency": quote_currency,
                             "event_time": timestamp,
                             "close_time": end,
                             "open": op,
