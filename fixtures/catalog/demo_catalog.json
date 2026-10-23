@@ -1,0 +1,30 @@
+{
+  "schema_version": 1,
+  "source_id": "demo_catalog",
+  "source_uri": "fixture:split_demo_catalog_v1",
+  "available_as_of": "2026-10-08T00:00:00Z",
+  "metadata_status": "DEMO",
+  "assets": [
+    {
+      "id": "46c77014-7d43-5613-b8e7-6e71ca081111",
+      "symbol": "SPLIT-DEMO",
+      "display_name": "Split e dividendo — instrumento sintético DEMO",
+      "asset_type": "equity",
+      "currency": "USD",
+      "venue": "DEMO",
+      "primary_exchange": "DEMO",
+      "timezone": "America/New_York",
+      "calendar_id": "XNYS",
+      "instrument_kind": "spot",
+      "identifiers": [
+        {
+          "native_id": "ticker",
+          "version": 1,
+          "identifier_type": "ticker",
+          "value": "SPLIT-DEMO",
+          "venue": "DEMO"
+        }
+      ]
+    }
+  ]
+}

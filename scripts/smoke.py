@@ -1,6 +1,7 @@
 """Smoke do stack local. Não chama fornecedores externos nem executa ordens."""
 
 import argparse
+from datetime import datetime, timezone
 import json
 import os
 from docker_utils import add_compose_arguments, compose_from_args, run_compose
@@ -20,6 +21,30 @@ def request(path, payload=None):
     with urllib.request.urlopen(req, timeout=10) as response:
         return json.load(response)
 
+
+def verify_catalog_integrity(asset_id):
+    calendar = request(f"/assets/{asset_id}/calendar?from=2026-11-26&to=2026-11-27")
+    assert calendar["status"] == "AVAILABLE" and calendar["calendar_id"] == "XNYS"
+    assert len(calendar["items"]) == 1 and calendar["items"][0]["session_date"] == "2026-11-27"
+    close_at = datetime.fromisoformat(calendar["items"][0]["close_at"].replace("Z", "+00:00"))
+    assert close_at == datetime(2026, 11, 27, 18, tzinfo=timezone.utc), "Meia sessão NYSE incorreta"
+    future = next(row for row in request("/assets?q=ES")["items"] if row["symbol"] == "ES")
+    unavailable = request(f"/assets/{future['id']}/calendar?from=2026-11-26&to=2026-11-27")
+    assert unavailable["status"] == "UNAVAILABLE" and not unavailable["items"], "Futuro herdou calendário NYSE"
+    matches = request("/assets?q=SPLIT-DEMO")["items"]
+    assert len(matches) == 1 and matches[0]["data_mode"] == "DEMO"
+    demo_id = matches[0]["id"]
+    query = "source=demo&corporate_action_source=demo&as_of=2026-10-09T12:00:00Z&from=2026-01-30T00:00:00Z&to=2026-02-04T00:00:00Z"
+    raw_path = f"/assets/{demo_id}/bars?{query}&adjustment=unadjusted"
+    raw = request(raw_path)
+    adjusted = request(f"/assets/{demo_id}/bars?{query}&adjustment=split_dividend_adjusted")
+    assert [row["close"] for row in raw["items"]] == [100, 50, 49]
+    assert [row["close"] for row in adjusted["items"]] == [49, 49, 49]
+    assert [row["volume"] for row in adjusted["items"]] == [2000, 2000, 2000]
+    assert adjusted["adjustment"] == "split_dividend_adjusted" and adjusted["data_mode"] == "DEMO"
+    assert adjusted["currency"] == "USD" and adjusted["action_source_id"] == "demo"
+    assert [row["close"] for row in request(raw_path)["items"]] == [100, 50, 49], "Ajuste alterou barras originais"
+    print("CATALOG INTEGRITY OK: calendars, raw preservation, split and dividend factors")
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
@@ -43,6 +68,7 @@ def main():
     assert bars["items"] and bars["data_mode"] == "DEMO", "Série demo não identificada"
     returns = request(f"/assets/{asset_id}/returns")
     assert returns["items"], "Retornos ausentes"
+    verify_catalog_integrity(asset_id)
     assert request("/providers")["items"], "Registry de fontes vazio"
     assert request("/macro/calendar")["items"], "Calendário demo vazio"
     request("/institutional/filings")

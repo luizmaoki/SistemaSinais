@@ -105,3 +105,31 @@ A validação PostgreSQL capitalverifyabf0b3b1d865 terminou PASSED com migraçã
 ## Passo 2 — CI remota aprovada em 17 de outubro de 2026
 
 A execução 39045560779 terminou com jobs checks e oidc em success no commit de código e612462b83e28ba960e1c649ef1facb3657d8d49. Confirmados remotamente: 116 testes backend, nove operacionais, instalação limpa, migração/restauração, persistência, smoke, build e regressão web nos modos demo (16 cenários) e OIDC real (12 cenários). São 18 cenários web distintos entre os modos. O passo 2 está concluído para desenvolvimento local. Evidência: docs/auth-ci-validation.md. PR 1 disponível para revisão; não houve merge ou deploy em produção. As dependências e os recursos futuros permanecem registrados em docs/auth-step-2.md.
+
+## Passo 3 iniciado em 17 de outubro de 2026
+
+Escopo confirmado pelo roteiro Word: catálogo e integridade dos dados. O resumo anterior de cinco itens do README foi alinhado às 13 etapas para evitar confundir este passo com notícias/IA, que pertencem ao passo 7. Em implementação: importação validada, identidade e vigência, calendários explícitos, eventos corporativos e visões de preços ajustadas com proveniência. Não se declara a etapa concluída antes dos testes e das duas revisões independentes dos cálculos. Decisões e dependências em docs/catalog-step-3.md e docs/decisions/005-catalog-integrity.md.
+
+## Passo 3 — validação integrada em 21/22 de outubro de 2026
+
+A instalação isolada capitalverify895423bed0e4 terminou PASSED: migração 0003, backup/restauração com igualdade das 20 tabelas, seed idempotente, persistência após recriar containers, smoke de calendários e ajustes, logs e limpeza. A suíte backend passou com 165 testes; nove testes operacionais passaram. A interface passou em lint, tipagem, build e 25 cenários Playwright DEMO, incluindo a fixture real SPLIT-DEMO; dois cenários exclusivos OIDC foram ignorados nessa execução.
+
+Em ambiente isolado, os arquivos verificados acrescentaram GOOG, GOOGL, BRK.A e BRK.B sem criar preços. Reimportação retornou UNCHANGED. A resolução por CIK compartilhado retornou 409 com os dois UUIDs corretos para cada emissor.
+
+A revisão independente encontrou falhas que impedem encerrar a etapa: reidentificação de opções ao alterar tipo/strike no mesmo UUID, denominação inconsistente de preços/indicadores sem moeda, mapeamento Coinbase que usava só ticker sem conferir venue/moeda e alertas que comparavam valores sem unidade compatível, exibindo a moeda atual do cadastro em observações históricas. A prova Coinbase usou exclusivamente transporte e candles sintéticos; nenhuma API real foi consultada. Correções e nova revisão estão em andamento. Os testes acima são anteriores a essas correções e não constituem aceite do código final.
+
+O ambiente OIDC principal permanece na revisão 0002; backup oidc-pre-step3-20261021T104447Z.dump teve restauração verificada das 18 tabelas. Nenhum banco do operador foi substituído. Procedimento, limites, comandos e dependências em docs/catalog-step-3.md.
+
+
+## Passo 3 — correções testadas, aceite pendente em 22/10/2026
+
+As quatro falhas da revisão foram corrigidas com regressões dirigidas: imutabilidade de tipo/strike de opções, coerência da denominação em catálogo/scanner, vínculo Coinbase por UUID/produto/venue/moeda e alertas com unidades válidas e apresentação da moeda histórica observada. Os 21 testes específicos passaram; o teste web de moeda dos alertas falhou antes e passou após a correção.
+
+A execução final local passou em 186 testes backend e nove operacionais. Lint, tipagem e build passaram. No navegador, passaram 26 cenários DEMO (dois OIDC ignorados) e 21 OIDC com Keycloak real (sete DEMO ignorados). A instalação isolada capitalverify583792d684a6 terminou PASSED com migração 0003, restauração de 20 tabelas, igualdade de conteúdo, seed idempotente, persistência, logs, worker, smoke e limpeza. Evidências em artifacts/catalog-foundation-20261022.log, artifacts/catalog-demo-e2e-20261022.log e artifacts/catalog-oidc-e2e-20261022.log; relatório em artifacts/foundation/capitalverify583792d684a6/report.json. O snapshot de 82 arquivos de código/testes está registrado em artifacts/catalog-source-snapshot-20261022.json.
+
+A branch local codex/catalog-data-integrity preserva as alterações ainda sem commit. Os dois revisores independentes atingiram limite de uso; a rechecagem final das correções permanece pendente. Não houve publicação do passo 3, CI remota nova ou migração do banco OIDC do operador, que continua em 0002 com backup/restauração conferidos. Os ambientes isolados de navegador foram encerrados preservando seus volumes; os dados do operador e o arquivo Word foram preservados. O passo 3 ainda não está encerrado. Procedimento e dependências externas em docs/catalog-step-3.md.
+
+
+## Passo 3 — duas revisões aprovadas em 23/10/2026
+
+A revisão de contratos, compatibilidade e reversão aprovou o código final após repetir 21 testes. A revisão financeira e de dados também aprovou, repetindo 42 testes sem rede, incluindo as provas independentes das correções de ingestão e alertas. Não há bloqueantes remanescentes nos pareceres. Os 82 hashes correspondem ao snapshot final testado; cobertura externa de dados continua fora desse aceite. Publicação/CI e atualização local serão registradas após execução.

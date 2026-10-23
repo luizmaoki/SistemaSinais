@@ -29,9 +29,9 @@ def test_initial_migration_upgrade_downgrade_upgrade(tmp_path, monkeypatch):
                 command.check(config)
                 with Session(engine) as session:
                     seed(session)
-                    before = {table.name: set(session.execute(select(table)).all()) for table in Base.metadata.sorted_tables}
+                    before = {table.name: session.execute(select(table).order_by(*table.primary_key.columns)).all() for table in Base.metadata.sorted_tables}
                     seed(session)
-                    after = {table.name: set(session.execute(select(table)).all()) for table in Base.metadata.sorted_tables}
+                    after = {table.name: session.execute(select(table).order_by(*table.primary_key.columns)).all() for table in Base.metadata.sorted_tables}
                     assert before == after
                     assert before["market_bars"] and before["users"]
                 # Populated schema, with foreign keys enabled in Alembic too.
@@ -56,13 +56,20 @@ def test_oidc_migration_preserves_populated_legacy_data(tmp_path, monkeypatch):
     config = Config(str(Path(__file__).resolve().parents[1] / "alembic.ini"))
 
     def legacy_snapshot(connection):
+        additions = {
+            "users": {"active", "oidc_issuer", "oidc_subject"},
+            "assets": {"calendar_id", "instrument_kind", "metadata_status", "metadata_source_id", "metadata_source_uri", "metadata_available_as_of", "metadata_ingested_at"},
+            "asset_identifiers": {"venue", "chain_id", "native_id", "version", "checksum", "cancelled", "source_uri", "available_as_of", "ingested_at"},
+            "asset_corporate_actions": {"native_id", "version", "checksum", "source_uri", "available_as_of", "ingested_at", "cancelled"},
+            "market_bars": {"currency"},
+        }
         return {
             table.name: connection.execute(select(*[
                 column for column in table.columns
-                if not (table.name == "users" and column.name in {"active", "oidc_issuer", "oidc_subject"})
+                if column.name not in additions.get(table.name, set())
             ]).order_by(*table.primary_key.columns)).all()
             for table in Base.metadata.sorted_tables
-            if table.name not in {"auth_flows", "auth_sessions"}
+            if table.name not in {"auth_flows", "auth_sessions", "catalog_imports", "corporate_action_coverage"}
         }
 
     try:
@@ -106,6 +113,44 @@ def test_oidc_migration_preserves_populated_legacy_data(tmp_path, monkeypatch):
                     and index["column_names"] == ["oidc_issuer", "oidc_subject"]
                     for index in indexes
                 )
+            finally:
+                engine.dispose()
+    finally:
+        get_settings.cache_clear()
+
+
+def test_catalog_migration_preserves_all_0002_rows_and_currency(tmp_path, monkeypatch):
+    from sqlalchemy import MetaData
+
+    url = "sqlite:///" + str(tmp_path / "populated-catalog-migration.db")
+    config = Config(str(Path(__file__).resolve().parents[1] / "alembic.ini"))
+    try:
+        with monkeypatch.context() as context:
+            context.setenv("DATABASE_URL", url)
+            get_settings.cache_clear()
+            command.upgrade(config, "head")
+            engine = build_engine(url)
+            try:
+                with Session(engine) as session:
+                    seed(session)
+                command.downgrade(config, "0002")
+                legacy = MetaData()
+                legacy.reflect(bind=engine)
+                def snapshot():
+                    with engine.connect() as connection:
+                        return {name: connection.execute(select(table).order_by(*table.primary_key.columns)).all() for name, table in legacy.tables.items() if name != "alembic_version"}
+                before = snapshot()
+                command.upgrade(config, "head")
+                command.check(config)
+                assert snapshot() == before
+                with engine.connect() as connection:
+                    from sqlalchemy import text
+                    assert connection.execute(text("SELECT COUNT(*) FROM market_bars WHERE currency IS NULL OR currency != 'USD'")).scalar() == 0
+                command.downgrade(config, "0002")
+                assert snapshot() == before
+                command.upgrade(config, "head")
+                command.check(config)
+                assert snapshot() == before
             finally:
                 engine.dispose()
     finally:

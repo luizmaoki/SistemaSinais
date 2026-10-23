@@ -43,14 +43,23 @@ Demo é restrita a desenvolvimento pessoal. OIDC com Keycloak local está implem
 
 ## Evolução
 
-1. Consolidar os critérios restantes das fases 0/1 e integrar calendários oficiais.
-2. Autenticação OIDC com isolamento multi-tenant e testes de autorização.
-3. Notícias licenciadas e análise fundamentada com citações, somente para fontes que permitam IA.
-4. Streaming cripto e reorgs/on-chain; depois 13F/Form 4/COT/opções.
-5. L2/L3 licenciado, backtests point-in-time, scores calibrados e robustez SaaS.
+O roteiro de 13 etapas segue o arquivo Word do projeto:
+
+1. Consolidar a fundação — concluído.
+2. Implementar autenticação real — concluído para desenvolvimento local.
+3. Completar catálogo e integridade dos dados — em implementação; veja docs/catalog-step-3.md.
+4. Adicionar preços reais autorizados.
+5. Completar dashboard, gráficos e scanner.
+6. Completar macro e disclosures.
+7. Implementar notícias e análise fundamentada por IA.
+8. Implementar cripto, carteiras e alavancagem.
+9. Implementar institucionais e opções.
+10. Implementar liquidez e microestrutura.
+11. Implementar sinais e Strategy Lab.
+12. Preparar operação em nuvem e SaaS.
+13. Executar o aceite final.
 
 O status de cada recurso precisa ser conferido em docs/progress.md; uma rota existente não implica integração completa ou dados ao vivo.
-
 ## Passo 1 da evolução
 
 Procedimento e evidências em docs/foundation-step-1.md. Validação isolada: python scripts/foundation_check.py. Backup com conferência de restauração: scripts/db_backup.py. O workflow de CI inclui essas verificações; execução remota depende do repositório de destino.

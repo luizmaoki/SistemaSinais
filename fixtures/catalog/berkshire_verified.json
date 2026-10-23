@@ -1,0 +1,67 @@
+{
+  "schema_version": 1,
+  "source_id": "catalog_sec_verified",
+  "source_uri": "https://www.sec.gov/Archives/edgar/data/1067983/000119312526344495/d159922d8k.htm",
+  "available_as_of": "2026-10-19T16:12:24.929739+00:00",
+  "metadata_status": "VERIFIED",
+  "assets": [
+    {
+      "id": "95dcd904-4f41-54a1-b388-22c71c11c779",
+      "symbol": "BRK.A",
+      "display_name": "Berkshire Hathaway — Class A",
+      "asset_type": "equity",
+      "currency": "USD",
+      "venue": "NYSE",
+      "primary_exchange": "NYSE",
+      "mic": "XNYS",
+      "timezone": "America/New_York",
+      "calendar_id": "XNYS",
+      "instrument_kind": "spot",
+      "cik": "0001067983",
+      "identifiers": [
+        {
+          "native_id": "ticker",
+          "version": 1,
+          "identifier_type": "ticker",
+          "value": "BRK.A",
+          "venue": "NYSE"
+        },
+        {
+          "native_id": "issuer-cik",
+          "version": 1,
+          "identifier_type": "cik",
+          "value": "0001067983"
+        }
+      ]
+    },
+    {
+      "id": "91acd089-0d26-57d2-852b-986de3a7edba",
+      "symbol": "BRK.B",
+      "display_name": "Berkshire Hathaway — Class B",
+      "asset_type": "equity",
+      "currency": "USD",
+      "venue": "NYSE",
+      "primary_exchange": "NYSE",
+      "mic": "XNYS",
+      "timezone": "America/New_York",
+      "calendar_id": "XNYS",
+      "instrument_kind": "spot",
+      "cik": "0001067983",
+      "identifiers": [
+        {
+          "native_id": "ticker",
+          "version": 1,
+          "identifier_type": "ticker",
+          "value": "BRK.B",
+          "venue": "NYSE"
+        },
+        {
+          "native_id": "issuer-cik",
+          "version": 1,
+          "identifier_type": "cik",
+          "value": "0001067983"
+        }
+      ]
+    }
+  ]
+}

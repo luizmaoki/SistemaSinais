@@ -1,0 +1,67 @@
+{
+  "schema_version": 1,
+  "source_id": "catalog_sec_verified",
+  "source_uri": "https://www.sec.gov/Archives/edgar/data/1652044/000165204426000059/goog-20260602.htm",
+  "available_as_of": "2026-10-19T16:12:24.929739+00:00",
+  "metadata_status": "VERIFIED",
+  "assets": [
+    {
+      "id": "f2a32d43-b466-5024-a1a7-c4d3eed612d3",
+      "symbol": "GOOG",
+      "display_name": "Alphabet — Class C",
+      "asset_type": "equity",
+      "currency": "USD",
+      "venue": "NASDAQ",
+      "primary_exchange": "NASDAQ",
+      "mic": "XNAS",
+      "timezone": "America/New_York",
+      "calendar_id": "XNYS",
+      "instrument_kind": "spot",
+      "cik": "0001652044",
+      "identifiers": [
+        {
+          "native_id": "ticker",
+          "version": 1,
+          "identifier_type": "ticker",
+          "value": "GOOG",
+          "venue": "NASDAQ"
+        },
+        {
+          "native_id": "issuer-cik",
+          "version": 1,
+          "identifier_type": "cik",
+          "value": "0001652044"
+        }
+      ]
+    },
+    {
+      "id": "0747fa38-a628-5ed9-abdf-1d407781fc87",
+      "symbol": "GOOGL",
+      "display_name": "Alphabet — Class A",
+      "asset_type": "equity",
+      "currency": "USD",
+      "venue": "NASDAQ",
+      "primary_exchange": "NASDAQ",
+      "mic": "XNAS",
+      "timezone": "America/New_York",
+      "calendar_id": "XNYS",
+      "instrument_kind": "spot",
+      "cik": "0001652044",
+      "identifiers": [
+        {
+          "native_id": "ticker",
+          "version": 1,
+          "identifier_type": "ticker",
+          "value": "GOOGL",
+          "venue": "NASDAQ"
+        },
+        {
+          "native_id": "issuer-cik",
+          "version": 1,
+          "identifier_type": "cik",
+          "value": "0001652044"
+        }
+      ]
+    }
+  ]
+}

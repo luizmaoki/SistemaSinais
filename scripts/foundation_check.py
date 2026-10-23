@@ -17,6 +17,7 @@ STABLE_TABLES = {
     "alembic_version", "assets", "asset_identifiers", "asset_corporate_actions",
     "users", "tenants", "market_bars", "filings", "macro_events", "watchlists",
     "watchlist_assets", "alert_rules", "alerts", "audit_logs", "auth_sessions", "auth_flows",
+    "catalog_imports", "corporate_action_coverage",
 }
 
 
